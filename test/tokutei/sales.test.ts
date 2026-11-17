@@ -63,4 +63,12 @@ test('一度入れた商品をお気に入りに：明細はつながず・同�
   // 品目のない商品は、入れた明細の品目で埋める
   const bare = products.map((p) => ({...p, category: '', sub: ''}));
   assert.deepEqual(['category', 'sub'].map((k) => rememberFavorites(bare, [a], false, 4000)[0][k]), ['入浴補助用具', '浴槽台']);
+  // 商品名・メーカーが同じでも品番がちがえば別の商品（カタログ p.49 のシャワー用車いす U型 イエロー：KS12 と KS11-PF/ST。2026-11-17 のコードの読み直し）。
+  // どちらかに品番がなければ前と同じく1つ
+  const ks12 = item({id: 'k1', name: '見本の車いす イエロー', code: 'KS12'});
+  const ks11 = item({id: 'k2', name: '見本の車いす イエロー', code: 'KS11-PF/ST'});
+  const two = rememberFavorites(rememberFavorites([], [ks12], true, 5000), [ks11], true, 6000);
+  assert.deepEqual(two.map((p) => p.code), ['KS12', 'KS11-PF/ST']);
+  assert.equal(rememberFavorites(two, [item({id: 'k3', name: '見本の車いす イエロー', code: 'ks-12'})], true, 7000).length, 2); // 書き方ちがいの同じ品番
+  assert.equal(rememberFavorites(two, [item({id: 'k4', name: '見本の車いす イエロー', code: ''})], true, 7000).length, 2);
 });

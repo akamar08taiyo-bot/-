@@ -8,6 +8,7 @@
 import {saleTotals} from './calc.ts';
 import type {Totals} from './calc.ts';
 import {guessCategory} from './category.ts';
+import {customerName, withoutBlankItems} from './sales.ts';
 import type {Sale, Settings} from './types.ts';
 
 export const URIAGE_IMPORT_KEY = 'taiyo-uriage-import-v1';
@@ -38,7 +39,8 @@ const SLIP_CATEGORY: Record<string, string> = {
 /** 商品の種目から売上伝票の種目（同じものは1つ）。入浴補助用具は細目で決める（入浴台・すのこ・介助ベルトは売上伝票に種目がない） */
 export function slipCategories(sale: Pick<Sale, 'items'>): string[] {
   const out: string[] = [];
-  for (const i of sale.items) {
+  // 何も入れていない商品の欄（種目だけ選んだ欄）は数えない。見積書・販売受注簿と同じ（前は売っていない種目まで伝票に出た。2026-11-17 のコードの読み直し）
+  for (const i of withoutBlankItems(sale as Sale).items) {
     const g = i.category ? {category: i.category, sub: i.sub} : guessCategory(i.name);
     const name = g.category === '入浴補助用具' ? SLIP_CATEGORY[g.sub || guessCategory(i.name).sub] : SLIP_CATEGORY[g.category];
     if (name && !out.includes(name)) out.push(name);
@@ -81,7 +83,7 @@ export function uriageRequest(sale: Sale, s: Pick<Settings, 'markupRate' | 'limi
       serviceType: 'specific',
       issueDate: c.issueDate,
       staff: sale.staff.trim(),
-      customerName: sale.customer.trim(),
+      customerName: customerName(sale), // 「様」まで打っていたら外す（伝票で「様様」にならないように）
       customerAddress: sale.address.trim(),
       officeName: sale.careOffice.trim(),
       careManager: sale.careManager.trim(),

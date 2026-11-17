@@ -128,6 +128,9 @@ test('販売受注簿へ渡す内容：受注区分「給付」の1点1ページ
   assert.equal(h.items.reduce((n, i) => n + i.benefit.insurerBurden, 0), t.insurerBurden);
   // 名前がなければ「特定福祉用具」だけ。担当がいなければ空（受注簿の初めの値のまま）
   assert.deepEqual([hacchuImport(sale(two()), S).title, hacchuImport(sale(two()), S).sales], ['特定福祉用具', '']);
+  // 「様」まで打っても題名・お客様名は「様様」にしない
+  const sama = hacchuImport(sale(two(), {customer: '見本 花子 様'}), S);
+  assert.deepEqual([sama.title, sama.customerName], ['見本 花子様 特定福祉用具', '見本 花子']);
   // 納品日は初め空白のまま。空白でも販売受注簿へ渡せる（受注簿の納品予定日は空のまま。ユーザーの指示「納品日はデフォルトは空白で良い。空白でも販売受注簿を作成できるようにする」2026-10-28）
   assert.equal(newSale([], defaultSettings(), 'yukuhashi').deliveryDate, ''); // 新しい見積もりの納品日は空白
   assert.equal(hacchuImport(sale(two()), S).deliveryDate, '');

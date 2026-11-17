@@ -9,7 +9,7 @@ import type {Totals} from './calc.ts';
 import type {Sale, Settings, TaxType} from './types.ts';
 import {staffShort, yen} from './util.ts';
 import {telWithHyphens} from './tel.ts';
-import {withoutBlankItems} from './sales.ts';
+import {customerName, withoutBlankItems} from './sales.ts';
 
 export const HACCHU_IMPORT_KEY = 'taiyo-hacchu-import-v1';
 /**
@@ -92,7 +92,7 @@ export function hacchuImport(all: Sale, s: Pick<Settings, 'markupRate' | 'limit'
   const sale = withoutBlankItems(all); // 何も入れていない商品の欄は送らない（受注簿に0円のページができた）
   const t = saleTotals(sale, s);
   const split = benefitSplit(t, sale.welfare);
-  const customer = sale.customer.trim();
+  const customer = customerName(sale); // 「様」まで打っていても題名が「様様」にならないように
   return {
     kind: 'taiyo-tokutei-order',
     v: 1,

@@ -118,10 +118,19 @@ export function itemFromProduct(p: Product, settings: Pick<Settings, 'discountRa
  * 手で入れた商品（商品マスタにない）で、商品名のあるもの。同じ名前・メーカーの商品がもう商品マスタにあれば入れない
  * （ユーザーの指示「商品名や金額を一度入力したら、お気に入り登録として追加できるようにする。印刷の前に、お気に入り登録するか否かの確認」2026-10-26）
  */
-export function unregisteredItems(sale: Pick<Sale, 'items'>, products: Pick<Product, 'name' | 'maker'>[]): SaleItem[] {
-  const key = (name: string, maker: string) => `${name.normalize('NFKC').replace(/\s+/g, '')}|${makerKey(maker)}`;
-  const known = new Set(products.map((p) => key(p.name, p.maker)));
-  return sale.items.filter((i) => i.productId === null && i.name.trim() && !known.has(key(i.name, i.maker)));
+export function unregisteredItems(sale: Pick<Sale, 'items'>, products: (Pick<Product, 'name' | 'maker'> & {code?: string})[]): SaleItem[] {
+  return sale.items.filter((i) => i.productId === null && i.name.trim() && !products.some((p) => sameProduct(p, i)));
+}
+
+/**
+ * 同じ商品か：商品名・メーカーが同じで、品番も同じ（どちらかに品番がなければ商品名・メーカーだけ）。
+ * カタログ p.49 の「シャワー用車いす U型 イエロー」は KS12 と KS11-PF/ST で名前・メーカーが同じで品番と定価がちがう（前は品番を見ず、
+ * あとで選んだ方がお気に入りに入らず、お気に入りから入れると先の方の品番・定価が入った。2026-11-17 のコードの読み直し）
+ */
+function sameProduct(p: {name: string; maker: string; code?: string}, i: {name: string; maker: string; code?: string}): boolean {
+  const name = (v: string) => v.normalize('NFKC').replace(/\s+/g, '');
+  const code = (v = '') => v.normalize('NFKC').replace(/[\s\-‐－ー―]/g, '').toUpperCase();
+  return name(p.name) === name(i.name) && makerKey(p.maker) === makerKey(i.maker) && (!code(p.code) || !code(i.code) || code(p.code) === code(i.code));
 }
 
 /**
@@ -166,12 +175,10 @@ export function addFavorites(products: Product[], items: SaleItem[], ids: Set<st
  * revive のときだけ★に戻す（カタログから選んだとき。お気に入りから「削除」したあと、また選んだら戻る）。種目・品目がなければ入れた明細の値で埋める
  */
 export function rememberFavorites(products: Product[], items: SaleItem[], revive: boolean, now = Date.now()): Product[] {
-  const key = (name: string, maker: string) => `${name.normalize('NFKC').replace(/\s+/g, '')}|${makerKey(maker)}`;
   let out = products;
   for (const i of items) {
     if (i.productId !== null || !i.name.trim()) continue;
-    const k = key(i.name, i.maker);
-    const at = out.findIndex((p) => key(p.name, p.maker) === k);
+    const at = out.findIndex((p) => sameProduct(p, i));
     if (at >= 0) {
       const p = out[at];
       const fill = (!p.category && i.category) || (!p.sub && i.sub);
@@ -214,9 +221,11 @@ export function markUsed(products: Product[], productId: string, now = Date.now(
   return products.map((p) => (p.id === productId ? {...p, useCount: p.useCount + 1, lastUsedAt: now} : p));
 }
 
+/** お客様名（「様」まで打っていたら外す。見積書の宛名・販売受注簿の題名で「様様」にならないように。2026-11-17 のコードの読み直し） */
+export const customerName = (sale: Pick<Sale, 'customer'>): string => sale.customer.trim().replace(/[ 　]*様$/, '');
 /** お客様名の表示（未入力でも一覧で分かるように） */
 export function customerLabel(sale: Sale): string {
-  return sale.customer.trim() ? `${sale.customer.trim()} 様` : '（お客様名未入力）';
+  return customerName(sale) ? `${customerName(sale)} 様` : '（お客様名未入力）';
 }
 
 /** 印刷・申請の前に確かめてほしいこと（種目が決まっていない・価格がない商品など）。

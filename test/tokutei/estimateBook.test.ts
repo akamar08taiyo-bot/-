@@ -6,7 +6,7 @@ import test from 'node:test';
 import {strFromU8, unzipSync} from 'fflate';
 import {basisNote, itemNote, saleTotals} from '../../src/tokutei/calc.ts';
 import {defaultSettings, settingsForOffice} from '../../src/tokutei/defaults.ts';
-import {CONT_ROWS, contBlock, ESTIMATE_CAPACITY, ESTIMATE_ROWS, estimateFileName, estimateLayout, estimateNotes, estimateOverflow, insuranceLines, estimatePreview, fillEstimate, fitScale, itemNameLines, belowItemLines, MIN_SHOWN_ROWS, saleLayout, shownRowsOnPage1} from '../../src/tokutei/estimateBook.ts';
+import {CONT_ROWS, contBlock, ESTIMATE_CAPACITY, ESTIMATE_ROWS, estimateBelowLost, estimateFileName, estimateLayout, estimateNotes, estimateOverflow, insuranceLines, estimatePreview, fillEstimate, fitScale, itemNameLines, belowItemLines, MIN_SHOWN_ROWS, saleLayout, shownRowsOnPage1} from '../../src/tokutei/estimateBook.ts';
 import type {Sale, SaleItem} from '../../src/tokutei/types.ts';
 import {cellFormula, readCell, sheetLayout} from '../../src/tokutei/xlsxEdit.ts';
 import type {Files} from '../../src/tokutei/xlsxEdit.ts';
@@ -85,6 +85,8 @@ const SH = '見積書';
 test('販売見積書：宛名・見積番号・見積日・営業所・件名・明細（品名・数量・単位・単価・金額の式・税率）', () => {
   const f = unzipSync(fillEstimate(template(), sale(), S));
   assert.equal(readCell(f, SH, 'A6'), '　見本 花子　様');
+  // 「様」まで打っても宛名は「様様」にしない（保存の名前と同じ扱い）
+  assert.equal(readCell(unzipSync(fillEstimate(template(), sale({customer: '見本 花子様'}), S)), SH, 'A6'), '　見本 花子　様');
   assert.equal(readCell(f, SH, 'I4'), '№　20261022-1');
   assert.equal(readCell(f, SH, 'I5'), '46317'); // 2026-10-22（Excel の日付の数）
   // 会社の欄（ユーザーの指示「会社名や社長名などの部分は、左寄せを統一」「会社住所の下に、電話番号とFAX番号」「担当名をいれる」）：1行ずつ・式ではなく値
@@ -225,6 +227,10 @@ test('販売見積書の原本：所長の印影の画像・作った人・パ�
   assert.equal(ESTIMATE_CAPACITY, 32);
   assert.equal(estimateOverflow(sale({items: manyFull(ESTIMATE_CAPACITY)})), 0); // 品名が3行の商品は（4商品からは商品の間をあけないので）32点まで
   assert.equal(estimateOverflow(sale({items: manyFull(ESTIMATE_CAPACITY + 2)})), 2);
+  // 商品で3ページ目の最後まで埋まると介護保険の内訳が入らない → 知らせる（前は黙って消えた）
+  assert.equal(estimateBelowLost(sale({items: manyFull(3)}), S), false);
+  assert.equal(estimateBelowLost(sale({items: manyFull(ESTIMATE_CAPACITY)}), S), true);
+  assert.equal(estimateBelowLost(sale({items: []}), S), false);
 });
 
 /** 架空の商品 n 点（定価 10,000円・課税）。品名は1行（メーカー・品番なし） */

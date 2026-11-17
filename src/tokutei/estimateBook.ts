@@ -16,7 +16,7 @@ import {strFromU8, strToU8} from 'fflate';
 import {itemNote, saleTotals} from './calc.ts';
 import type {Totals} from './calc.ts';
 import {OFFICES} from './defaults.ts';
-import {customerLabel, withoutBlankItems} from './sales.ts';
+import {customerName, withoutBlankItems} from './sales.ts';
 import {sheetPreviewPages} from './shinseiPreview.ts';
 import type {PvPage, Range} from './shinseiPreview.ts';
 import type {Sale, SaleItem, Settings, TaxType} from './types.ts';
@@ -271,7 +271,7 @@ export function fillEstimateFiles(files: Files, all: Sale, s: Settings): void {
   };
   // 宛名は左に詰めず、全角のすき間1つあける（ユーザーの指示「名前の部分は左に詰めるのではなく、スペース一つ分あける」2026-10-26）
   // お客様名が空なら名前の所は空けておく（手で書けるように。前は画面の「（お客様名未入力）」がそのまま見積書に出た）
-  put('A6', `　${sale.customer.trim() ? customerLabel(sale).replace(/\s*様$/, '') : '　'.repeat(8)}　様`);
+  put('A6', `　${customerName(sale) || '　'.repeat(8)}　様`);
   // 宛名の字は原本（16pt）より2段大きく（ユーザーの指示「名前の部分は2段階ぐらい大きくする」2026-10-28。A6:E7 の結合＝高さ30pt に入る。長い名前は原本どおり縮めて入れる）。
   // 2・3ページ目の宛名は、ここで書いたあとの写しなので同じ大きさ
   xml = setStyle(xml, 'A6', String(sizeStyle(files, numOf(attrOf(cellRe('A6').exec(xml)?.[1] ?? '', 's'), 0), NAME_PT)));
@@ -539,6 +539,11 @@ export const estimateFileName = (sale: Pick<Sale, 'customer'>): string => `${est
 
 /** 3ページの明細に入らない商品の数 */
 export const estimateOverflow = (sale: Sale) => Math.max(0, sale.items.length - estimateLayout(sale.items.map((i) => itemNameLines(i).length), 0).items.length);
+/** 介護保険の内訳（介護保険の対象・利用者負担・保険者負担の行）が3ページに入らないか。商品で3ページ目の最後まで埋まると、前は内訳が黙って消えた（2026-11-17 のコードの読み直し） */
+export const estimateBelowLost = (all: Sale, s: Settings): boolean => {
+  const sale = withoutBlankItems(all);
+  return sale.items.length > 0 && belowCount(sale, s) > 0 && saleLayout(sale, s).below < 0;
+};
 
 /** 備考の3行に入らない行の数 */
 export const estimateNoteOverflow = (sale: Pick<Sale, 'note'>) => Math.max(0, noteLines(sale).length - NOTE_ROWS.length);

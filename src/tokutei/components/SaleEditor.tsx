@@ -17,7 +17,7 @@ import type {Update} from '../useStore.ts';
 import {yen} from '../util.ts';
 import {fiscalYearOf} from '../wareki.ts';
 import {addressOfZip, isZipHead, withoutDoubledHead, zipCandidates, zipLabel} from '../zip.ts';
-import {ESTIMATE_CAPACITY, ESTIMATE_LABEL, ESTIMATE_NOTE_LINES, estimateNoteOverflow, estimateOverflow, estimatePreview} from '../estimateBook.ts';
+import {ESTIMATE_CAPACITY, ESTIMATE_LABEL, ESTIMATE_NOTE_LINES, estimateBelowLost, estimateNoteOverflow, estimateOverflow, estimatePreview} from '../estimateBook.ts';
 import type {EstimateField} from '../estimateBook.ts';
 import {saveEstimateBook, useEstimateTemplate} from '../print/estimateFiles.ts';
 import {CatalogPrintView} from '../print/CatalogPrint.tsx';
@@ -554,6 +554,7 @@ export function SaleEditor({
             <aside ref={estBox} className="min-w-0 space-y-3 lg:sticky lg:top-3 lg:max-h-[calc(100vh-1.5rem)] lg:self-start lg:overflow-y-auto" style={{scrollbarGutter: 'stable'}}>
               <section className="rounded-xl bg-slate-200/70 p-2">
                 {estimateOverflow(sale) > 0 && <p className="mb-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">見積書の明細は3ページ・{ESTIMATE_CAPACITY}点までです（{estimateOverflow(sale)}点が入りません）</p>}
+                {estimateOverflow(sale) === 0 && estimateBelowLost(sale, s) && <p className="mb-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">見積書に介護保険の内訳が入りません（商品を減らしてください）</p>}
                 {estimateNoteOverflow(sale) > 0 && (
                   <p className="mb-2 rounded-md bg-rose-50 p-2 text-xs font-bold text-rose-700">見積書の備考は{ESTIMATE_NOTE_LINES}行までです（{estimateNoteOverflow(sale)}行が入りません）</p>
                 )}

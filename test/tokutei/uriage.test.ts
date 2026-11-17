@@ -65,6 +65,9 @@ test('介護度・種目を売上伝票の書き方に', () => {
   const sale = filled();
   sale.items.push(item({id: 'c', name: '見本 多点杖', category: '歩行補助つえ', sub: '多点杖'}), item({id: 'd', name: '見本 浴室内すのこ', category: '入浴補助用具', sub: '浴室内すのこ'}));
   assert.deepEqual(slipCategories(sale), ['シャワーチェア', '浴槽台', '歩行補助杖']);
+  // 種目だけ選んで商品を入れていない欄は数えない（見積書・販売受注簿と同じ）
+  sale.items.push(item({id: 'e', name: '', code: '', maker: '', tais: '', listPrice: 0, cost: 0, unitPrice: null, category: '歩行器', sub: ''}));
+  assert.deepEqual(slipCategories(sale), ['シャワーチェア', '浴槽台', '歩行補助杖']);
 });
 
 test('足りないもの：窓で入れるもの（負担割合・介護度・新規／既存・納品日）と見積書で入れるもの', () => {
