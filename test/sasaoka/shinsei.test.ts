@@ -2002,9 +2002,16 @@ test('みやこ町の委任状（受領委任払い用）：受任者（事業�
 test('行橋市の請求書（事業所が請求する）：事業所名・住所・代表者名・担当・請求内容・公費負担額＝保険給付額・個人負担額・総合計', () => {
   const j = job({insurer: 'yukuhashi', staff: '見本 三郎', address: '福岡県行橋市見本1-1', shinsei: {...NO_SHINSEI, burden: '1'}});
   const v = shinseiValues(j, ADD_S);
-  const {byName} = sheets(fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, v));
+  const {files, byName} = sheets(fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, v));
   assert.deepEqual([...byName.keys()].slice(0, 3), ['住改・受領委任払', '委任状', '請求書']);
   const c = byName.get('請求書')!;
+  // 宛名「行橋市長　工　藤　政　宏　様」（市の原本の字）は A5:O5 より1割ほど長いので「縮小して全体を表示」。
+  // 事業所名・住所の欄は原本では印刷の範囲（A:AE）より1列広い（T8:AF8）ので、AE までに（2026-11-17。ユーザーの「します」）
+  assert.match(c, /<mergeCell ref="T8:AE8"\/>/);
+  assert.match(c, /<mergeCell ref="T9:AE9"\/>/);
+  const a5 = Number(/<c r="A5" s="(\d+)"/.exec(c)?.[1]);
+  const xfs = /<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/.exec(new TextDecoder().decode(files['xl/styles.xml']))![1].match(/<xf\b[\s\S]*?(?:\/>|<\/xf>)/g)!;
+  assert.match(xfs[a5], /shrinkToFit="(?:true|1)"/);
   assert.deepEqual(['T8', 'T9', 'T10', 'T11'].map((r) => txt(c, r)), ['太陽シルバーサービス株式会社　見本営業所', '福岡県見本市見本1-1', '所長　見本 次郎', '見本 三郎']);
   assert.equal(txt(c, 'I21'), '介護保険住宅改修費（山田 太郎　様）');
   const yen = (r: string) => Number(txt(c, r).replace(/,/g, ''));
