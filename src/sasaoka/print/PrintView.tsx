@@ -128,9 +128,12 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
   const [overlayRef, fitScale, side] = useFitScale(request.kind === 'estimate' ? 297 : 210);
   const [actualSize, setActualSize] = useState(false);
   const zoom = actualSize ? 1 : fitScale;
+  // 縮めて見せるときは、原寸で組んだ用紙の高さ（transform の前）を測り、縮めたあとの高さだけ場所を取る
+  const [rootH, setRootH] = useState(0);
   // 見積書は A4 の用紙いっぱいに（useFillFormPages）
   const rootRef = useRef<HTMLDivElement>(null);
   useFillFormPages(rootRef, [request, data.jobs, data.settings, form]);
+  useResize(rootRef, (el) => setRootH(el.offsetHeight), []);
   // 上の帯の高さ（用紙の右の「印刷する」を、帯のすぐ下に止めておく）
   const barRef = useRef<HTMLDivElement>(null);
   const [barH, setBarH] = useState(60);
@@ -238,9 +241,17 @@ export function PrintView({request, data, onClose}: {request: PrintRequest; data
         </div>
       </div>
       <div className={side ? 'print-body side' : 'print-body'}>
-        {/* 画面の幅が足りないときは zoom で縮める（印刷するときは CSS で原寸に戻す） */}
-        <div ref={rootRef} className="print-root" style={zoom < 1 ? {zoom} : undefined}>
-          {sheets}
+        {/* 画面の幅が足りないとき（スマホ）は縮めて見せる（印刷するときは CSS で原寸に戻す）。CSS の zoom ではなく transform で縮める：
+            zoom だと罫線が画面の1画素より細くならず、35% ほどに縮めると 0.75pt の線が字に比べて3倍ほど太くなって、欄の中の字が線に押し出されていた
+            （広域連合の見積書の「内訳書　様式」・改修箇所の欄など。2026-11-17）。transform なら原寸と同じ組み方のまま縮めるので、パソコンで見るのと同じ形になる */}
+        <div className="print-zoom" style={zoom < 1 ? {height: rootH * zoom, overflow: 'hidden'} : undefined}>
+          <div
+            ref={rootRef}
+            className="print-root"
+            style={zoom < 1 ? {width: `${100 / zoom}%`, transform: `scale(${zoom})`, transformOrigin: '0 0'} : undefined}
+          >
+            {sheets}
+          </div>
         </div>
         {side && (
           <div className="print-side" style={{top: barH + 16}}>

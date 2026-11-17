@@ -64,7 +64,7 @@ img {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(184px, 1fr);
 }
-.print-body.side > .print-root {
+.print-body.side > .print-zoom {
   grid-column: 2;
 }
 .print-side {
@@ -885,9 +885,15 @@ table.fm .yk-issuer {
   .print-body {
     display: block !important;
   }
+  .print-zoom {
+    height: auto !important;
+    overflow: visible !important;
+  }
   .print-root {
     padding: 0;
     zoom: 1 !important; /* 画面で縮めて見せていても、印刷は原寸 */
+    width: auto !important;
+    transform: none !important;
   }
   .sheet {
     width: auto;

@@ -160,8 +160,8 @@ box = await sheetBox();
 assert.ok(box.width > 700, `拡大していない: ${box.width}`);
 await p2.getByRole('button', {name: '全体を表示'}).click();
 await p2.emulateMedia({media: 'print'});
-const printZoom = await p2.locator('.print-root').evaluate((el) => getComputedStyle(el).zoom);
-assert.equal(printZoom, '1');
+const printZoom = await p2.locator('.print-root').evaluate((el) => [getComputedStyle(el).zoom, getComputedStyle(el).transform]);
+assert.deepEqual(printZoom, ['1', 'none']); // スマホの印刷イメージは transform で縮めている（印刷は原寸）
 await p2.emulateMedia({media: 'screen'});
 log('スマホの印刷イメージが画面に収まるOK');
 
