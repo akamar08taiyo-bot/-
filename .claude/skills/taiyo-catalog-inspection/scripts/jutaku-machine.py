@@ -5,6 +5,9 @@
 #     P34NV-400-00・DX14C・35LB4R・EL5060-1M-NS・AF-1 のように前の決まりに当たらず、②の候補にも出なかった）
 #  ④ TOTO：カタログの品番索引（p.101・102）にない枠の品番（PDF の文字の欠け「TS139CEE1」・略した「CL10R」・「タイプ番号」を見つけた）と、
 #     索引にあるのにどのページにも枠のない品番（「2m：EWT22AG32」「◆CES9710C#NW1」の前に字の付いたもの）
+#  ⑤ 矢崎化工：色の記号のない枠（写真・取付図・説明の囲みの札）で、同じページに色つきの同じ品番の枠（表の行）があるもの。手引きの21で外す枠の候補
+#     （2026-11-17 の検品2回目で p.12・16・24・29・40・41・47・49・53 に見つかった。施工例の図の札＝このページの表にない品番は残す）
+#  ⑥ TOTO：PDF の文字に「品番＃色」（全角の＃）・「品番 注2週」（受注生産の札）の形があるのに、その品番の枠がないもの（p.78 の背もたれの表の行）
 # 使い方：python3 jutaku-machine.py <S>（<S>/insp/jutaku/data.json は jutaku-dump.ts で、いまのアプリのデータから作り直してから）
 import json, re, sys, unicodedata
 S = sys.argv[1]
@@ -64,4 +67,24 @@ for book in ('toto', 'matsu6'):
     report[book] = {'bad': bad, 'miss': miss, 'shohinRowsWithoutBox': rows, 'notInIndex': not_in_index, 'indexWithoutBox': index_missing}
     print(book, '①枠の品番が近くの文字にない', len(bad), '／ ②文字にあるのに枠がない品番の形の語', len(miss),
           '／ ③商品コードの行に枠がない', len(rows), '／ ④索引にない枠の品番', len(not_in_index), '・索引にあるのに枠がない', len(index_missing))
+# ⑤ 矢崎化工の札（色の記号のない枠）と、同じページの色つきの表の行
+YCOLOR = re.compile(r' (?!(?:SET|T)$)(?:[A-Z]{1,3}\d?|\d{1,2}[\uFF66-\uFF9F]{2,5}(?: [A-Z]{1,3}\d?)?)$')
+labels = []
+for p in D['yazaki']:
+    names = [c[0] for c in p['codes']]
+    for c in p['codes']:
+        if not YCOLOR.search(c[0]) and any(n2.startswith(c[0] + ' ') and YCOLOR.search(n2) for n2 in names):
+            labels.append((p['page'], c[0], round(c[1], 3), round(c[2], 3)))
+report['yazaki'] = {'labelWithRow': labels}
+print('yazaki ⑤札で、同じページの色つきの表の行にも枠がある', len(labels))
+# ⑥ TOTO の全角の＃・注2週 の付いた品番に枠がない
+wide = []
+have = {(p['page'], c[0]) for p in D['toto'] for c in p['codes']}
+for tp in TEXT['toto']:
+    for it in tp['items']:
+        m = re.match(r'^\s*(' + TOK['toto'].replace('(?:#', '(?:[#＃]') + r')\s*(?:注\d+週)?\s*$', it[0])
+        if m and ('＃' in it[0] or '週' in it[0]) and (tp['page'], m.group(1).replace('＃', '#')) not in have:
+            wide.append((tp['page'], it[0]))
+report['toto']['wideHashOrBadgeWithoutBox'] = wide
+print('toto ⑥全角の＃・注2週 の付いた品番に枠がない', len(wide))
 json.dump(report, open(f'{S}/insp/jutaku/machine.json', 'w'), ensure_ascii=False, indent=1)
