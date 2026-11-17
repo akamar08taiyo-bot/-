@@ -167,7 +167,7 @@ await page.getByText('トイレに入れました').last().waitFor();
 const svgNow = await art();
 const door = /translate\(([\d.]+) 3640\) rotate\(0\)/.exec(svgNow); // ドアの開口のまん中が壁の上（y＝和室と廊下の間の壁）
 assert.ok(door && (Number(door[1]) - 390) % 227.5 === 0, `ドアの開口の端は半マスの半分にそろう ${door?.[1]}`);
-assert.match(svgNow, /translate\(2985 30\)/); // 便器はトイレの上の壁の面（y=30）にぴったり・左右のまん中（3.5マス＝3185）
+assert.match(svgNow, /translate\(2930 30\)/); // 便器はトイレの上の壁の面（y=30）にぴったり・左右のまん中（3.5マス＝3185）。部屋に合わせた 510×730（2026-11-17）
 log('ドアは壁に・便器は壁ぎわ OK');
 
 // ---------------- 申請書の箇所：前もって部品を並べる「置き場」は出さない（ユーザーの指示「事前に線や番号をおいておくのはなしで」2026-11-11）。
@@ -949,14 +949,14 @@ log('申請書の平面図の枠から描いて入れる OK');
   await tool('浴槽');
   await page.getByText('浴室に入れました').last().waitFor();
   const a1 = await art();
-  assert.match(a1, /translate\(2985 30\)"><rect x="20" y="0" width="360" height="182"/, '便器はトイレの上の壁ぎわのまん中');
-  assert.match(a1, /translate\(3800 30\)/, '浴槽は浴室の上の長い壁ぎわのまん中');
+  assert.match(a1, /translate\(2930 30\)"><rect x="25.5" y="0" width="459" height="189.8"/, '便器はトイレの上の壁ぎわのまん中・部屋に合わせた 510×730');
+  assert.match(a1, /translate\(3795 30\)"><rect width="1510" height="590"/, '浴槽は浴室の上の長い壁ぎわのまん中・部屋に合わせた 1510×590（ユーザーの指示「このぐらいのサイズで自動的に入るようにする」2026-11-17）');
   {
     const c0 = await toPx(3000, 0);
     await page.screenshot({path: path.join(outDir, 'madori-fix-in-room.png'), clip: {x: Math.max(0, c0.x - 260), y: Math.max(0, c0.y - 60), width: 620, height: 260}});
   }
   const toilet = async () => {
-    const m = /<g transform="translate\(([\d.-]+) ([\d.-]+)\)(?: rotate\(([\d.]+) 200 350\))?"><rect x="20" y="0" width="360" height="182"/.exec(await art());
+    const m = /<g transform="translate\(([\d.-]+) ([\d.-]+)\)(?: rotate\(([\d.]+) 255 365\))?"><rect x="25.5" y="0" width="459" height="189.8"/.exec(await art());
     assert.ok(m, '便器が見つかる');
     return {x: Number(m[1]), y: Number(m[2]), rot: Number(m[3] ?? 0)};
   };
@@ -970,7 +970,7 @@ log('申請書の平面図の枠から描いて入れる OK');
   await page.mouse.move(p1.x, p1.y, {steps: 4});
   await page.mouse.up();
   let t = await toilet();
-  assert.ok(Math.abs(t.x - 3085) <= 10 && t.y === 30, `100mm 動かした所に止まる ${JSON.stringify(t)}`);
+  assert.ok(Math.abs(t.x - 3030) <= 10 && t.y === 30, `100mm 動かした所に止まる ${JSON.stringify(t)}`);
   // 矢印キーは 10mm ずつ、右の枠の「微調整」も 10mm、Shift＋矢印は半マス
   const x0 = t.x;
   await page.keyboard.press('ArrowRight');
@@ -988,7 +988,7 @@ log('申請書の平面図の枠から描いて入れる OK');
   t = await toilet();
   const hb = await page.locator('[data-turn-handle] circle').boundingBox();
   const h0 = {x: hb.x + hb.width / 2, y: hb.y + hb.height / 2};
-  const c = await toPx(t.x + 200, t.y + 350);
+  const c = await toPx(t.x + 255, t.y + 365);
   const r = Math.hypot(h0.x - c.x, h0.y - c.y);
   await page.mouse.move(h0.x, h0.y);
   await page.mouse.down();
@@ -999,7 +999,7 @@ log('申請書の平面図の枠から描いて入れる OK');
   const deg = page.getByRole('textbox', {name: '向き'});
   assert.ok(Math.abs(Number(await deg.inputValue()) - 45) <= 2);
   {
-    const cc = await toPx(t.x + 200, t.y + 350);
+    const cc = await toPx(t.x + 255, t.y + 365);
     await page.screenshot({path: path.join(outDir, 'madori-rotate.png'), clip: {x: Math.max(0, cc.x - 220), y: Math.max(0, cc.y - 170), width: 440, height: 300}});
   }
   // 向きの欄に打つ → その角度。↻ を押すだけなら 90° 回る（今までと同じ）

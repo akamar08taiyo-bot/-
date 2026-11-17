@@ -229,6 +229,28 @@ const FIX_HOME: {fix: string[]; room: string[]}[] = [
 ];
 
 /**
+ * 部屋に自動で入れる便器・浴槽の大きさ（ユーザーの指示「トイレボタン浴槽ボタンを押すとこのサイズで入るが、このぐらいのサイズで自動的に入るようにする」2026-11-17。
+ * 決まった大きさ（便器 400×700・浴槽 1500×750）だと、ドラッグで大きく描いた部屋では小さく見えた）。部屋の内のり（along＝背中を付ける壁の長さ・depth＝奥行）に合わせる：
+ * 便器は幅が部屋の短い方の 6 割・奥行は幅の 1.45 倍（部屋の奥行の 56% まで）、浴槽は長さが壁の 86%・奥行は長さの半分（部屋の奥行の 45% まで）。
+ * どちらも決まった大きさの 0.5〜2 倍（便器は 0.8〜1.8 倍）の間。ユニットバスなどほかの住設は決まった大きさのまま
+ */
+function fixSizeIn(type: string, along: number, depth: number, def: {w: number; h: number}): {w: number; h: number} {
+  const r10 = (v: number) => Math.round(v / 10) * 10;
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+  if (type === '洋式便器' || type === '和式便器') {
+    const w = clamp(Math.min(along, depth) * 0.6, def.w * 0.8, def.w * 1.8);
+    const h = Math.min(w * (type === '洋式便器' ? 1.45 : def.h / def.w), Math.max(depth * 0.56, def.h * 0.8));
+    return {w: r10(w), h: r10(h)};
+  }
+  if (type === '浴槽') {
+    const w = clamp(along * 0.86, def.w * 0.5, def.w * 2);
+    const h = Math.min(w * (def.h / def.w), Math.max(depth * 0.45, def.h * 0.5));
+    return {w: r10(w), h: r10(h)};
+  }
+  return {w: def.w, h: def.h};
+}
+
+/**
  * 便器・浴槽を、その階のトイレ・浴室の部屋の中に置く（まだ便器・浴槽の入っていない部屋のうち、いちばん初めに描いたもの）。
  * 背中（上の辺）を壁の面に付けてまん中に。どの壁に付けるかは、入る壁 → ドアのない壁 → 縦長の便器は短い壁・横長の浴槽は長い壁 →
  * ドアからいちばん遠い壁 の順で選ぶ。入る部屋がなければ null（今までどおり、押した所に置く）
@@ -252,26 +274,38 @@ export function fixInRoom(type: string, items: MItem[]): {item: MItem; room: MIt
   const y0 = b.y + HALF_WALL;
   const x1 = b.x + b.w - HALF_WALL;
   const y1 = b.y + b.h - HALF_WALL;
-  const {w, h} = def;
   const doors = items.filter((o) => o.kind === 'door').map((o) => ({x: o.x, y: o.y}));
   const near = 60; // ドアのまん中が壁の線からこの幅なら、その壁のドア
+  const tall = def.h > def.w; // 縦長（便器）は短い壁・横長（浴槽）は長い壁に背中を付けるのが自然
+  // 壁ごとに、その壁に背中を付けたときの大きさ（fixSizeIn）と置き場所
   const sides = [
-    {rot: 0, along: x1 - x0, depth: y1 - y0, line: (q: P) => Math.abs(q.y - b.y) <= near && q.x >= b.x && q.x <= b.x + b.w, dist: (q: P) => Math.abs(q.y - b.y), box: {x: (x0 + x1) / 2 - w / 2, y: y0, w, h}},
-    {rot: 90, along: y1 - y0, depth: x1 - x0, line: (q: P) => Math.abs(q.x - (b.x + b.w)) <= near && q.y >= b.y && q.y <= b.y + b.h, dist: (q: P) => Math.abs(q.x - (b.x + b.w)), box: {x: x1 - h, y: (y0 + y1) / 2 - w / 2, w: h, h: w}},
-    {rot: 180, along: x1 - x0, depth: y1 - y0, line: (q: P) => Math.abs(q.y - (b.y + b.h)) <= near && q.x >= b.x && q.x <= b.x + b.w, dist: (q: P) => Math.abs(q.y - (b.y + b.h)), box: {x: (x0 + x1) / 2 - w / 2, y: y1 - h, w, h}},
-    {rot: 270, along: y1 - y0, depth: x1 - x0, line: (q: P) => Math.abs(q.x - b.x) <= near && q.y >= b.y && q.y <= b.y + b.h, dist: (q: P) => Math.abs(q.x - b.x), box: {x: x0, y: (y0 + y1) / 2 - w / 2, w: h, h: w}},
-  ].map((sd, i) => ({
-    ...sd,
-    i,
-    fits: w <= sd.along + 1 && h <= sd.depth + 1,
-    door: doors.some(sd.line),
-    match: w >= h === sd.along >= sd.depth,
-    far: doors.length ? Math.min(...doors.map(sd.dist)) : 0,
-  }));
+    {rot: 0, along: x1 - x0, depth: y1 - y0, line: (q: P) => Math.abs(q.y - b.y) <= near && q.x >= b.x && q.x <= b.x + b.w, dist: (q: P) => Math.abs(q.y - b.y)},
+    {rot: 90, along: y1 - y0, depth: x1 - x0, line: (q: P) => Math.abs(q.x - (b.x + b.w)) <= near && q.y >= b.y && q.y <= b.y + b.h, dist: (q: P) => Math.abs(q.x - (b.x + b.w))},
+    {rot: 180, along: x1 - x0, depth: y1 - y0, line: (q: P) => Math.abs(q.y - (b.y + b.h)) <= near && q.x >= b.x && q.x <= b.x + b.w, dist: (q: P) => Math.abs(q.y - (b.y + b.h))},
+    {rot: 270, along: y1 - y0, depth: x1 - x0, line: (q: P) => Math.abs(q.x - b.x) <= near && q.y >= b.y && q.y <= b.y + b.h, dist: (q: P) => Math.abs(q.x - b.x)},
+  ].map((sd, i) => {
+    const {w, h} = fixSizeIn(def.name, sd.along, sd.depth, def);
+    const box =
+      sd.rot === 0 ? {x: (x0 + x1) / 2 - w / 2, y: y0, w, h}
+      : sd.rot === 90 ? {x: x1 - h, y: (y0 + y1) / 2 - w / 2, w: h, h: w}
+      : sd.rot === 180 ? {x: (x0 + x1) / 2 - w / 2, y: y1 - h, w, h}
+      : {x: x0, y: (y0 + y1) / 2 - w / 2, w: h, h: w};
+    return {
+      ...sd,
+      i,
+      w,
+      h,
+      box,
+      fits: w <= sd.along + 1 && h <= sd.depth + 1,
+      door: doors.some(sd.line),
+      match: tall ? sd.along <= sd.depth : sd.along >= sd.depth,
+      far: doors.length ? Math.min(...doors.map(sd.dist)) : 0,
+    };
+  });
   const best = [...sides].sort((a, c) => +c.fits - +a.fits || +a.door - +c.door || +c.match - +a.match || c.far - a.far || a.i - c.i)[0];
   if (!best.fits) return null;
-  const at = fromBox(best.box, w, h);
-  const item: MItem = {id: mid(), kind: 'fix', type: def.name, x: Math.round(at.x), y: Math.round(at.y), w, h, ...(best.rot ? {rot: best.rot} : {})};
+  const at = fromBox(best.box, best.w, best.h);
+  const item: MItem = {id: mid(), kind: 'fix', type: def.name, x: Math.round(at.x), y: Math.round(at.y), w: best.w, h: best.h, ...(best.rot ? {rot: best.rot} : {})};
   return {item, room};
 }
 

@@ -253,7 +253,8 @@ test('便器はトイレの中・浴槽は浴室の中：ドアのない壁に�
   const wc = room('wc', 0, 0, M, 1.5 * M, 'トイレ'); // 910×1365
   const t1 = fixInRoom('洋式便器', [wc])!;
   assert.equal(t1.room.id, 'wc');
-  assert.deepEqual([t1.item.x, t1.item.y, t1.item.rot ?? 0], [255, 30, 0]); // 上の短い壁の面（30）に背中・左右のまん中（455−200）
+  assert.deepEqual([t1.item.x, t1.item.y, t1.item.rot ?? 0], [200, 30, 0]); // 上の短い壁の面（30）に背中・左右のまん中（455−255）
+  assert.deepEqual([t1.item.w, t1.item.h], [510, 730]); // 部屋に合わせた大きさ（幅は内のりの 6 割。決まった大きさの 400×700 ではない）
   // ドアが上の壁にあれば、下の短い壁に背中（180°）
   const top: MItem = {id: 'd', kind: 'door', type: '片開き戸', x: 455, y: 0, w: 600, h: 0};
   const t2 = fixInRoom('洋式便器', [wc, top])!;
@@ -269,11 +270,21 @@ test('便器はトイレの中・浴槽は浴室の中：ドアのない壁に�
   const bath = room('b', 0, 0, 2 * M, 1.5 * M, '浴室');
   const down: MItem = {id: 'd2', kind: 'door', type: '折れ戸', x: M, y: 1.5 * M, w: 800, h: 0};
   const u = fixInRoom('浴槽', [bath, down])!;
-  assert.deepEqual([u.item.x, u.item.y, u.item.rot ?? 0], [160, 30, 0]);
+  assert.deepEqual([u.item.x, u.item.y, u.item.rot ?? 0, u.item.w, u.item.h], [155, 30, 0, 1510, 590]); // 長さは壁の 86%・奥行は部屋の奥行の 45% まで
   // 名前に「トイレ」とある部屋（種類が別でも）にも入る
   assert.ok(fixInRoom('和式便器', [{...room('x', 0, 0, M, 1.5 * M, '洗面所'), label: '1階トイレ'}]));
-  // 浴槽の入らない小さな浴室は null
-  assert.equal(fixInRoom('浴槽', [room('s', 0, 0, M, M, '浴室')]), null);
+  // 小さな浴室には小さく入る（前は決まった大きさの浴槽が入らず null）
+  assert.deepEqual(fixInRoom('浴槽', [room('s', 0, 0, M, M, '浴室')])!.item.w, 750);
+});
+
+test('便器・浴槽は部屋の大きさに合わせて入る（大きく描いた部屋では大きく。決まった大きさの 0.5〜2 倍まで）', () => {
+  // ユーザーの指示「トイレボタン浴槽ボタンを押すとこのサイズで入るが、このぐらいのサイズで自動的に入るようにする」2026-11-17
+  const big = fixInRoom('浴槽', [room('b', 0, 0, 3200, 2700, '浴室')])!.item;
+  assert.deepEqual([big.w, big.h], [2700, 1190]); // 壁の 86%（前は 1500×750 で部屋の半分ほどにしか見えなかった）
+  const wc = fixInRoom('洋式便器', [room('w', 0, 0, 1150, 2400, 'トイレ')])!.item;
+  assert.deepEqual([wc.w, wc.h], [650, 950]); // 幅は内のりの 6 割
+  assert.equal(fixInRoom('浴槽', [room('h', 0, 0, 9000, 9000, '浴室')])!.item.w, 3000); // とても大きな部屋でも 2 倍まで
+  assert.equal(fixInRoom('ユニットバス', [room('u', 0, 0, 3200, 2700, '浴室')])!.item.w, 1600); // ほかの住設は決まった大きさのまま
 });
 
 test('向きを 360° 自由に：↻ をドラッグした角度（0・90・180・270° の近くは吸い付き・Shift は 15°・Alt は 1°）。外まわり・読み込み・大きさ', () => {
