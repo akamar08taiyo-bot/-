@@ -93,6 +93,7 @@ export function FaxApp() {
   const [date, setDate] = useState(todayIso);
   const [showErrors, setShowErrors] = useState(false);
   const [overflowing, setOverflowing] = useState(false);
+  const [recipientScale, setRecipientScale] = useState(1);
   const [notice, setNotice] = useState<string | null>(null);
 
   const orgInputRef = useRef<HTMLInputElement>(null);
@@ -507,7 +508,15 @@ export function FaxApp() {
                   </p>
                 )}
                 <ScaledPreview>
-                  <FaxSheet data={sheetData} layout={layout} font={font} preview onOverflowChange={setOverflowing} />
+                  <FaxSheet
+                    data={sheetData}
+                    layout={layout}
+                    font={font}
+                    preview
+                    onOverflowChange={setOverflowing}
+                    recipientScale={recipientScale}
+                    onRecipientScaleChange={setRecipientScale}
+                  />
                 </ScaledPreview>
               </div>
             </div>
@@ -581,7 +590,7 @@ export function FaxApp() {
 
       {/* 印刷するのはこの1枚だけ（画面の部品は印刷時に隠す） */}
       <div className="fx-print-root">
-        <FaxSheet data={sheetData} layout={layout} font={font} />
+        <FaxSheet data={sheetData} layout={layout} font={font} recipientScale={recipientScale} />
       </div>
     </>
   );

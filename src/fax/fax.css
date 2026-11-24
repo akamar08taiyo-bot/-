@@ -232,11 +232,16 @@
 .fx-c-to {
   top: 64.8mm;
   left: 20mm;
-  max-width: 125mm;
-  white-space: normal;
+  right: 20mm;
+  white-space: nowrap;
   font-family: var(--fx-century), var(--fx-maru), sans-serif;
   font-size: 16pt;
   line-height: 1.45;
+}
+
+.fx-c-to-text {
+  display: inline-block;
+  transform-origin: left center;
 }
 
 .fx-c-pages {

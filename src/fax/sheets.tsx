@@ -28,6 +28,9 @@ interface SheetProps {
   preview?: boolean;
   /** 文章が枠からはみ出したかどうかを知らせる */
   onOverflowChange?: (overflowing: boolean) => void;
+  /** 従来の送信票では、画面で測った宛名の縮尺を印刷にも使う */
+  recipientScale?: number;
+  onRecipientScaleChange?: (scale: number) => void;
 }
 
 export function FaxSheet(props: SheetProps) {
@@ -150,10 +153,35 @@ const pagesText = (n: number) => (n < 10 ? String.fromCharCode(0xff10 + n) : Str
 /** 営業部名と営業所名を1行にする（例：東九州営業部　行橋営業所） */
 const officeLine = (sender: SenderInfo) => [sender.department, sender.office].filter(Boolean).join('　');
 
-function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
+function ClassicSheet({data, font, preview, onOverflowChange, recipientScale, onRecipientScaleChange}: SheetProps) {
   const boxRef = useOverflowReport(onOverflowChange);
+  const recipientLineRef = useRef<HTMLParagraphElement>(null);
+  const recipientTextRef = useRef<HTMLSpanElement>(null);
+  const recipientLine = data.to.line || (preview ? '〇〇〇〇　様' : '');
   const {sender} = data;
   const address = [sender.postal && `〒${sender.postal}`, sender.address].filter(Boolean).join('　');
+
+  useLayoutEffect(() => {
+    const line = recipientLineRef.current;
+    const text = recipientTextRef.current;
+    if (!line || !text || !onRecipientScaleChange) return;
+
+    const fit = () => {
+      // transform の影響を受けない幅で測り、フォントが読み込まれたときにも調整する。
+      const availableWidth = parseFloat(getComputedStyle(line).width);
+      const textWidth = parseFloat(getComputedStyle(text).width);
+      if (availableWidth > 0 && textWidth > 0) {
+        onRecipientScaleChange(Math.min(1, availableWidth / textWidth));
+      }
+    };
+
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(line);
+    observer.observe(text);
+    return () => observer.disconnect();
+  }, [font, recipientLine, onRecipientScaleChange]);
+
   return (
     <div className="fx-sheet fx-classic" style={sheetFontStyle(font)}>
       <StripeTop />
@@ -163,11 +191,15 @@ function ClassicSheet({data, font, preview, onOverflowChange}: SheetProps) {
           <span key={i}>{token}</span>
         ))}
       </p>
-      <p className="fx-c-to">
-        {data.to.line ? (
-          <span className="fx-u">{data.to.line}</span>
-        ) : (
-          preview && <span className="fx-u fx-ghost">〇〇〇〇　様</span>
+      <p className="fx-c-to" ref={recipientLineRef}>
+        {recipientLine && (
+          <span
+            className={data.to.line ? 'fx-c-to-text fx-u' : 'fx-c-to-text fx-u fx-ghost'}
+            ref={recipientTextRef}
+            style={{transform: `scale(${recipientScale ?? 1})`}}
+          >
+            {recipientLine}
+          </span>
         )}
       </p>
       {/* 元のWordは「本状を含み」「ご清祥の段、」だったが、FAXでよく使う「本状を含め」と、
