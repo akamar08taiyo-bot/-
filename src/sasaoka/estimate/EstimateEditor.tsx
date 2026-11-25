@@ -445,7 +445,7 @@ export function EstimateEditor({
         onPrint={() => onPrint({kind: 'estimate', jobId: job.id})}
         excel={docs?.excel}
         importButton={canImport && (
-          <Btn color="softBlue" disabled={readingEstimate} onClick={() => importInput.current?.click()}>
+          <Btn color="softBlue" className="min-h-12 w-48 max-w-full !text-base" disabled={readingEstimate} onClick={() => importInput.current?.click()}>
             {readingEstimate ? '読み込み中…' : '見積もりを取り込む'}
           </Btn>
         )}
