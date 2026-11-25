@@ -7,7 +7,7 @@ import {EstimateSheet} from '../components/EstimateSheet.tsx';
 import {missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
 import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
-import {Btn, TextInput, useToast} from '../components/ui.tsx';
+import {Btn, Modal, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, formLabel, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_SHINSEI} from '../estimateForms.ts';
 import {CARE_RED, careLines, showsCareLines} from '../careLines.ts';
 import {BurdenPicker} from './ShinseiEditor.tsx';
@@ -22,9 +22,11 @@ import {jutakuSalesMonth, withBillMonth, withSalesMonth} from '../salesPlan.ts';
 import type {AppData, Insurer, Job, Kit, Material, NameSuffix, Place, ShinseiInfo} from '../types.ts';
 import type {Update} from '../useStore.ts';
 import {rememberStaff} from '../lastStaff.ts';
-import {staffFull, thisMonth, todayIso} from '../util.ts';
+import {staffFull, thisMonth, todayIso, yen} from '../util.ts';
 import {duplicateEstimate} from './EstimateList.tsx';
 import {UriageDialog} from './UriageDialog.tsx';
+import {applyImport, compactName, readDoc} from '../importDocs.ts';
+import type {ReadDoc} from '../importDocs.ts';
 import type {JobDocs} from '../components/DocsDialog.tsx';
 
 // at：見積書で選んでいた（タップしていた）行。部材・部材＋施工費（常用）はそこに入れる（`insertRowsAt`）
@@ -67,6 +69,39 @@ export function EstimateEditor({
   const [uriageOpen, setUriageOpen] = useState(false);
 
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? startEstimate(j, {...fn(j), updatedAt: Date.now()}) : j)));
+  const canImport = !DEMO && s.officeName.trim() === '大分営業所';
+  const importInput = useRef<HTMLInputElement>(null);
+  const [readingEstimate, setReadingEstimate] = useState(false);
+  const [estimateImport, setEstimateImport] = useState<ReadDoc | null>(null);
+  const alreadyImported = (jobs: Job[], doc: ReadDoc) =>
+    jobs.some((j) => !j.trashedAt && j.imported?.some((d) => d.hash === doc.hash));
+
+  const readEstimateFile = async (file: File) => {
+    setReadingEstimate(true);
+    try {
+      const d = readDoc(new Uint8Array(await file.arrayBuffer()), file.name, s, file.lastModified, s.officeName.trim());
+      if (!d?.sourceSheet || !d.rows) {
+        toast('大分営業所の下請け見積書を読み取れませんでした。Excel形式と明細の合計を確認してください。', 'error');
+      } else {
+        setEstimateImport(d);
+      }
+    } catch {
+      toast('見積書を読み取れませんでした。', 'error');
+    } finally {
+      setReadingEstimate(false);
+    }
+  };
+
+  const importIntoEstimate = () => {
+    if (!canImport || !estimateImport || alreadyImported(data.jobs, estimateImport)) return;
+    const d = estimateImport;
+    update('jobs', (jobs) => {
+      if (alreadyImported(jobs, d)) return jobs;
+      return jobs.map((j) => j.id === job.id && !j.trashedAt ? applyImport(j, [d], d.name, j.month, s) : j);
+    });
+    setEstimateImport(null);
+  };
+
   // 負担割合・生活保護（申請書の項目。住宅改修申請書のタブ・特定福祉用具と同じ値）
   const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
   const setInfo = (patch: Partial<ShinseiInfo>) => setJob((j) => ({...j, shinsei: {...NO_SHINSEI, ...j.shinsei, ...patch}}));
@@ -349,6 +384,42 @@ export function EstimateEditor({
         }
       />
 
+      {canImport && (
+        <input
+          ref={importInput}
+          type="file"
+          accept=".xlsx"
+          hidden
+          onChange={(e) => {
+            const file = e.currentTarget.files?.[0];
+            e.currentTarget.value = '';
+            if (file) void readEstimateFile(file);
+          }}
+        />
+      )}
+      {canImport && estimateImport && (
+        <Modal
+          title="見積もりを取り込む"
+          onClose={() => setEstimateImport(null)}
+          footer={
+            <>
+              <Btn color="white" onClick={() => setEstimateImport(null)}>キャンセル</Btn>
+              <Btn color="emerald" onClick={importIntoEstimate} disabled={alreadyImported(data.jobs, estimateImport)}>この見積書に取り込む</Btn>
+            </>
+          }
+        >
+          <div className="space-y-2 text-sm text-slate-800">
+            <p className="break-all font-bold">{estimateImport.file}</p>
+            <p>{estimateImport.name}様の見積書　工事 {estimateImport.places.length}か所　税込 {yen(estimateImport.total ?? 0)}円</p>
+            <p>対象シート {estimateImport.sourceSheet}</p>
+            {estimated && <p>現在の明細に追加します。</p>}
+            {job.customer.trim() && compactName(job.customer) !== compactName(estimateImport.name) && (
+              <p className="font-bold text-amber-800">ファイルのお客様名は、現在の「{job.customer}」と異なります。取り込み先を確認してください。</p>
+            )}
+            {alreadyImported(data.jobs, estimateImport) && <p className="font-bold">このファイルは取り込み済みです。</p>}
+          </div>
+        </Modal>
+      )}
       <EstimateSheet
         job={job}
         settings={s}
@@ -364,6 +435,11 @@ export function EstimateEditor({
         onToggleFavorite={toggleFavorite}
         onPrint={() => onPrint({kind: 'estimate', jobId: job.id})}
         excel={docs?.excel}
+        importButton={canImport && (
+          <Btn color="softBlue" disabled={readingEstimate} onClick={() => importInput.current?.click()}>
+            {readingEstimate ? '読み込み中…' : '見積もりを取り込む'}
+          </Btn>
+        )}
         between={settingsRow}
         focusRow={focusRow}
       />

@@ -107,6 +107,7 @@ export function EstimateSheet({
   onToggleFavorite,
   onPrint,
   excel,
+  importButton,
   between,
   focusRow,
 }: {
@@ -123,6 +124,7 @@ export function EstimateSheet({
   onPrint: () => void;
   excel?: ReactNode; // 見積書の左の「📗 Excelで保存」（上の段と同じ。App.tsx の DocsButton）
   // 「部材リストから入れる」などの行のすぐ下に出すもの（工事見積書の保険者・担当・作成日・請求書の行。EstimateEditor.tsx）
+  importButton?: ReactNode;
   between?: ReactNode;
   // この行を選ぶ（部材を選ぶ画面で最後に入れた行。n が変わるたびに）。続けて「施工費」を押すと、その部材の同上施工費になる。
   // id が null はいちばん下の空いた行。labor：部材を選ぶ画面の「🔧 施工費に進む」（その行の施工費のリストも開く）
@@ -1226,10 +1228,15 @@ export function EstimateSheet({
       {/* 見積書の左のボタン：Excelで保存・見積書を印刷（前は部材・施工費・常用を入れるボタンと行の操作。部材などは空いた行の内容の欄に、行の操作は選んでいる行の左に移した。
           ユーザーの指示「現在の部材リスト、施工費から入れると書いてある場所には、印刷とExcel保存のボタンを設置」2026-11-03）。
           広い画面だけ（狭い画面は上の段と同じなので出さない）。見積書を下へ動かしてもついてくる（見えているページの表の横。上の sideRef） */}
-      <div className="relative hidden shrink-0 lg:block lg:w-60">
+      <div className={`relative shrink-0 lg:block lg:w-60 ${importButton ? '' : 'hidden'}`}>
+      {importButton && (
+        <div className="flex justify-center px-2 py-4 lg:absolute lg:inset-x-0 lg:top-0 lg:z-10">
+          {importButton}
+        </div>
+      )}
       <div
         ref={sideRef}
-        className="sheet-side absolute inset-x-0 top-0 flex flex-col gap-2 border-r border-slate-200 bg-slate-50 p-2 [&>*]:w-full [&>*]:!justify-start [&>*]:!text-[15px]"
+        className="sheet-side absolute inset-x-0 top-0 hidden flex-col lg:flex gap-2 border-r border-slate-200 bg-slate-50 p-2 [&>*]:w-full [&>*]:!justify-start [&>*]:!text-[15px]"
         role="toolbar"
         aria-label="見積書の左のボタン"
       >
