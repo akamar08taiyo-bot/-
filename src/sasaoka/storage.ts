@@ -583,12 +583,19 @@ export function cleanSettings(raw: unknown): Settings {
   ] as const) {
     if (typeof raw[k] === 'string') s[k] = raw[k] as string;
   }
-  const account = raw.bankAccount;
-  if (isObj(account)) {
-    const {institution, branch, type, number, holder} = account;
-    if (typeof institution === 'string' && typeof branch === 'string' && typeof type === 'string' && typeof number === 'string' && typeof holder === 'string') {
-      s.bankAccount = {institution, branch, type, number, holder};
-    }
+  const cleanAccount = (account: unknown): Settings['bankAccount'] => {
+    if (!isObj(account)) return undefined;
+    const {institution, branch, type, number, holder, kana, bankCode, branchCode} = account;
+    if (typeof institution !== 'string' || typeof branch !== 'string' || typeof type !== 'string' || typeof number !== 'string' || typeof holder !== 'string') return undefined;
+    return {institution, branch, type, number, holder, ...(typeof kana === 'string' ? {kana} : {}), ...(typeof bankCode === 'string' ? {bankCode} : {}), ...(typeof branchCode === 'string' ? {branchCode} : {})};
+  };
+  const account = cleanAccount(raw.bankAccount);
+  if (account) s.bankAccount = account;
+  if (isObj(raw.applicationAccounts)) {
+    s.applicationAccounts = Object.fromEntries(Object.entries(raw.applicationAccounts).flatMap(([key, value]) => {
+      const account = cleanAccount(value);
+      return key.trim() && account ? [[key, account]] : [];
+    }));
   }
   // 所長名を入れる前に保存した設定は、保存してある営業所の所長名にする
   if (typeof raw.manager !== 'string') s.manager = OFFICES.find((o) => o.name === s.officeName)?.manager ?? '';
@@ -599,6 +606,7 @@ export function cleanSettings(raw: unknown): Settings {
   s.totalTaxRounding = ROUNDINGS.includes(raw.totalTaxRounding as Rounding) ? (raw.totalTaxRounding as Rounding) : d.totalTaxRounding;
   s.placePresets = Array.isArray(raw.placePresets) ? cleanList(raw.placePresets) : DEFAULT_PLACES;
   s.staffList = Array.isArray(raw.staffList) ? cleanList(raw.staffList) : DEFAULT_STAFF;
+  if (typeof raw.applicationOffice === 'string' && raw.applicationOffice.trim()) s.applicationOffice = raw.applicationOffice.trim();
   if (typeof raw.applicationMobile === 'string' && raw.applicationMobile.trim()) s.applicationMobile = raw.applicationMobile.trim();
   if (typeof raw.applicationStaff === 'string' && raw.applicationStaff.trim()) s.applicationStaff = raw.applicationStaff.trim();
   if (typeof raw.lastStaff === 'string' && raw.lastStaff.trim()) s.lastStaff = raw.lastStaff.trim();

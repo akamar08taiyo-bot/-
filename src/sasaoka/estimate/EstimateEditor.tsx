@@ -257,7 +257,7 @@ export function EstimateEditor({
             ))}
           </select>
         </label>
-        {!fixedOffice && (
+        {fixedOffice !== '大分営業所' && (
           <label className="grid gap-1 text-sm font-bold text-slate-600">
             担当
             <select

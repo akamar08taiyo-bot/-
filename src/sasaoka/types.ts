@@ -364,7 +364,7 @@ export type EstimateForm = 'yukuhashi' | 'kouiki';
  */
 export type Insurer = 'kanda' | 'yukuhashi' | 'miyako' | 'kouiki' | 'fukuoka' | 'kitakyushu' | 'kurume' | 'iizuka' | 'oita';
 
-export type BankAccount = {institution: string; branch: string; type: string; number: string; holder: string};
+export type BankAccount = {institution: string; branch: string; type: string; number: string; holder: string; kana?: string; bankCode?: string; branchCode?: string};
 
 export type Settings = {
   clientName: string; // 請求先（笹岡工務店）
@@ -383,6 +383,8 @@ export type Settings = {
   entrustRegNo?: string;
   builders?: BuilderOffice[]; // 申請書の施工業者に足した営業所（2026-11-11。この項目を入れる前の設定にはないので省略可）
   bank: string; // 帳票に出すお振込先
+  applicationOffice?: string; // 共通情報で選択した営業所
+  applicationAccounts?: Record<string, BankAccount>; // 施工業者の営業所別に登録した振込先
   bankAccount?: BankAccount; // 共通情報の個別欄に入力した値
   subject: string; // 請求書の件名（「○年○月分」のあとに付く）
   invoiceNote: string; // 請求書の備考

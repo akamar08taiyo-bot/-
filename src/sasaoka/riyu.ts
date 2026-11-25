@@ -427,7 +427,7 @@ export function oitaRiyuCells(job: Job, s: EstimateSettings): RiyuValues {
 }
 
 /** 申請書（保険者の原本）に書く値：大分市は申請書の中の理由書（表）に、理由書のタブで入れた欄も書く（ほかの保険者の理由書は理由書のタブで別に作る） */
-export function shinseiBookValues(job: Job, s: EstimateSettings, today = todayIso()): ShinseiValues {
+export function shinseiBookValues(job: Job, s: Parameters<typeof shinseiValues>[1], today = todayIso()): ShinseiValues {
   const v = shinseiValues(job, s, today);
   return jobInsurer(job) === 'oita' ? {...v, riyu: oitaRiyuCells(job, s)} : v;
 }

@@ -6,7 +6,9 @@
 // 見積書・請求書の発行元は設定のまま（申請書だけ）。住宅改修（src/sasaoka/shinseiOffice.ts）と特定福祉用具（src/tokutei/shinseiOffice.ts）は同じ決まり
 import {DEMO} from './demo/flag.ts';
 import {BUILDER_OFFICES, OFFICES} from './company.ts';
-import type {BuilderOffice} from './types.ts';
+import {jobInsurer} from './estimateForms.ts';
+import {insurerAreaName, insurerNoOf} from './insurerNumbers.ts';
+import type {BuilderOffice, Job} from './types.ts';
 
 /** 保険者ごとの営業所（いくつかあるときは、区が分からないときの初めの営業所を先頭に） */
 const GROUPS: Record<string, string[]> = {
@@ -37,6 +39,21 @@ const AREA_OFFICE: Record<string, string> = {
 
 /** 広域連合の田川・桂川支部のうち田川営業所の受け持ち（田川市・田川郡） */
 const TAGAWA = ['田川市', '香春町', '添田町', '糸田町', '川崎町', '大任町', '赤村', '福智町'];
+
+const YUKUHASHI_AREAS = ['豊前市', '築上町', '吉富町', '上毛町'];
+
+export function fixedApplicationOffice(job: Pick<Job, 'insurer' | 'form' | 'address' | 'shinsei'>): string {
+  if (DEMO) return '';
+  const insurer = jobInsurer(job);
+  if (insurer === 'oita') return '大分営業所';
+  if (insurer === 'kanda' || insurer === 'yukuhashi' || insurer === 'miyako') return '行橋営業所';
+  if (insurer !== 'kouiki') return '';
+  const picked = (job.shinsei?.insurerNo ?? '').normalize('NFKC').replace(/\D/g, '');
+  const number = insurerNoOf(insurer, job.address, picked);
+  const area = insurerAreaName(insurer, number);
+  const address = job.address.normalize('NFKC').replace(/\s+/g, '');
+  return YUKUHASHI_AREAS.includes(area) && (picked === number || !address || address.includes(area)) ? '行橋営業所' : '';
+}
 
 /**
  * 申請書に書く営業所の名前。insurer は保険者（kurume など）、area は保険者番号の区・市町村の名前（insurerAreaName）、current は設定の営業所。

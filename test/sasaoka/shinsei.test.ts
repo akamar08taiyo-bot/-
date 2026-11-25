@@ -1658,35 +1658,18 @@ test('広域連合・みやこ町の写真貼付用紙の施工業者名は「�
   assert.ok(size > 0 && size * 1.25 * 2 <= ht + 0.5, `${size}pt × 2行 > ${ht}pt`);
 });
 
-test('行橋市・苅田町・みやこ町の原本に書いてある行橋営業所の名前・所在地・電話・所長は、設定の営業所がちがえばその営業所の字に（行橋営業所なら原本のまま）', () => {
-  const yk = {...RATES, ...settingsForOffice(defaultSettings(), '行橋営業所'), company: '太陽シルバーサービス株式会社'};
-  const kk = {...RATES, ...settingsForOffice(defaultSettings(), '小倉営業所'), company: '太陽シルバーサービス株式会社'};
-  const o = OFFICES.find((x) => x.name === '小倉営業所')!;
-  const addr = o.address.replace(/^福岡県/, '');
-  const mgr = o.manager.replace(/\s+/g, '　');
-  const yuku = (s: typeof yk) => sheets(fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, shinseiValues(job({insurer: 'yukuhashi', address: '福岡県行橋市見本1-1'}), s))).byName;
-  const a = yuku(kk);
-  const r = a.get('住改・受領委任払')!;
-  assert.deepEqual([txt(r, 'AB14'), txt(r, 'H28'), txt(r, 'H29'), txt(r, 'H30')], ['太陽シルバーサービス㈱\n小倉営業所', addr, `太陽シルバーサービス㈱\n小倉営業所　${mgr}`, o.tel]);
-  const p = a.get('委任状')!;
-  assert.equal(txt(p, 'C10'), `　${addr}`);
-  assert.equal(txt(p, 'C12'), `　電話番号　${o.tel}`);
-  assert.match(txt(p, 'C14'), new RegExp(`小倉営業所[\\s\\S]*${mgr}　 ㊞$`));
-  assert.doesNotMatch(txt(p, 'C14'), /行橋|久保/);
-  // 行橋営業所なら原本の字のまま（書きかえない＝原本の共有の文字のまま。並び・空白も）
-  const b = yuku(yk);
-  for (const [name, ref] of [['住改・受領委任払', 'H29'], ['住改・受領委任払', 'AB14'], ['委任状', 'C10'], ['委任状', 'C14']] as const) assert.match(cell(b.get(name)!, ref), /\st="s"/, `${name} ${ref}`);
-  // みやこ町：承認届出書の施工業者（支給申請書・内訳明細書の施工業者はこの欄を参照する式なので一緒に変わる）
-  const m = sheets(fillShinsei(MIYAKO, SHINSEI.miyako!, shinseiValues(job({insurer: 'miyako', address: '福岡県京都郡みやこ町見本1'}), kk))).byName;
-  const n = m.get('住宅改修承認届出書')!;
-  assert.deepEqual([txt(n, 'N17'), txt(n, 'N18'), txt(n, 'N19'), txt(n, 'N35')], ['太陽シルバーサービス株式会社　小倉営業所', addr, o.tel, `（本人との関係：事業者）電話番号　${o.tel}`]);
-  const shikyu = m.get('住宅改修費支給申請書(受領委任払用)')!;
-  // 式の答え（開いた時点に見せる値）も新しい営業所
-  assert.deepEqual(['N27', 'N29', 'N31'].map((ref) => /<v>([^<]*)<\/v>/.exec(cell(shikyu, ref))?.[1]), [addr, '太陽シルバーサービス株式会社　小倉営業所', o.tel]);
-  // 苅田町の委任状
-  const k = sheets(fillShinsei(KANDA, SHINSEI.kanda!, shinseiValues(job({insurer: 'kanda', address: '福岡県京都郡苅田町見本1'}), kk))).byName.get('委任状')!;
-  assert.deepEqual([txt(k, 'C10'), txt(k, 'C12')], [`　${addr}`, `　電話番号　${o.tel}`]);
-  assert.doesNotMatch(txt(k, 'C14'), /行橋|久保/);
+test('行橋市・苅田町・みやこ町は別営業所の設定でも行橋営業所の原本を使う', () => {
+  const yk = settingsForOffice(defaultSettings(), '行橋営業所');
+  const kk = settingsForOffice(defaultSettings(), '小倉営業所');
+  for (const [insurer, template, sheet] of [
+    ['yukuhashi', YUKUHASHI, '住改・受領委任払'],
+    ['kanda', KANDA, '委任状'],
+    ['miyako', MIYAKO, '住宅改修承認届出書'],
+  ] as const) {
+    const j = job({insurer});
+    const read = (s: typeof yk) => sheets(fillShinsei(template, SHINSEI[insurer]!, shinseiValues(j, s))).byName.get(sheet);
+    assert.equal(read(kk), read(yk), insurer);
+  }
 });
 
 test('広域連合の申請書（様式第2号・第7号・第2号別紙）の保険者番号のマス：原本の 406470 を、選んだ・住所の市町村の番号で書きかえる', () => {
@@ -1988,9 +1971,9 @@ test('みやこ町の委任状（受領委任払い用）：受任者（事業�
   // Excel のシートの並びは支給申請書のうしろ。原本のほかのシートはそのまま
   assert.deepEqual([...byName.keys()].slice(0, 4), ['住宅改修承認届出書', '住宅改修費支給申請書(受領委任払用)', '委任状', '住宅改修内訳明細書']);
   const p = byName.get('委任状')!;
-  assert.equal(txt(p, 'Z8'), '〒800-0000　福岡県見本市見本1-1');
-  assert.equal(txt(p, 'AF10'), '0930-00-0000');
-  assert.equal(txt(p, 'Z17'), '太陽シルバーサービス株式会社　見本営業所\n所長　見本 次郎');
+  assert.equal(txt(p, 'Z8'), '〒824-0043　福岡県行橋市大字流末1327番地');
+  assert.equal(txt(p, 'AF10'), '0930-26-9640');
+  assert.equal(txt(p, 'Z17'), '太陽シルバーサービス株式会社　行橋営業所\n所長　久保 匠史');
   assert.match(txt(p, 'M29'), /^[\d,]+$/);
   assert.equal(txt(p, 'M29'), v.texts.benefitYen);
   assert.equal(txt(p, 'V39'), '福岡県京都郡みやこ町見本1-2');
@@ -2012,7 +1995,7 @@ test('行橋市の請求書（事業所が請求する）：事業所名・住�
   const a5 = Number(/<c r="A5" s="(\d+)"/.exec(c)?.[1]);
   const xfs = /<cellXfs[^>]*>([\s\S]*?)<\/cellXfs>/.exec(new TextDecoder().decode(files['xl/styles.xml']))![1].match(/<xf\b[\s\S]*?(?:\/>|<\/xf>)/g)!;
   assert.match(xfs[a5], /shrinkToFit="(?:true|1)"/);
-  assert.deepEqual(['T8', 'T9', 'T10', 'T11'].map((r) => txt(c, r)), ['太陽シルバーサービス株式会社　見本営業所', '福岡県見本市見本1-1', '所長　見本 次郎', '見本 三郎']);
+  assert.deepEqual(['T8', 'T9', 'T10', 'T11'].map((r) => txt(c, r)), ['太陽シルバーサービス株式会社　行橋営業所', '福岡県行橋市大字流末1327番地', '所長　久保 匠史', '見本 三郎']);
   assert.equal(txt(c, 'I21'), '介護保険住宅改修費（山田 太郎　様）');
   const yen = (r: string) => Number(txt(c, r).replace(/,/g, ''));
   const cost = shinseiCost(j, ADD_S);
@@ -2023,7 +2006,7 @@ test('行橋市の請求書（事業所が請求する）：事業所名・住�
   // 負担割合を選んでいなければ金額は書かない（事業所・請求内容は書く）
   const none = sheets(fillShinsei(YUKUHASHI, SHINSEI.yukuhashi!, shinseiValues({...j, shinsei: {...NO_SHINSEI}}, ADD_S))).byName.get('請求書')!;
   assert.deepEqual(['I23', 'I25', 'I27'].map((r) => txt(none, r)), ['', '', '']);
-  assert.equal(txt(none, 'T8'), '太陽シルバーサービス株式会社　見本営業所');
+  assert.equal(txt(none, 'T8'), '太陽シルバーサービス株式会社　行橋営業所');
 });
 
 test('福岡市の承諾書：住宅の所有者が本人でないときだけ書いてプレビューに出す（区・申請者氏名・申請者住所）', () => {
@@ -2400,7 +2383,7 @@ test('事業所番号・受領委任契約番号のマス：申請書の営業�
   const iz = {...RATES, ...settingsForOffice(defaultSettings(), '飯塚営業所')};
   assert.equal(box(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県嘉麻市見本1'}), iz)), A, 'X', 21), '4071804183');
   // 一覧にない営業所の名前：ほかの営業所の番号を書かない（空のマス）
-  assert.equal(box(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県築上郡築上町椎田1-1'}), {...yk, officeName: '見本営業所'})), A, 'X', 21), '');
+  assert.equal(box(fillShinsei(KOUIKI, SHINSEI.kouiki!, shinseiValues(job({insurer: 'kouiki', address: '福岡県嘉麻市見本1'}), {...yk, officeName: '見本営業所'})), A, 'X', 21), '');
   // 行橋市の受領委任払の申請書（事業者番号 Z4:AI4）
   const ykh = fillShinsei(TEMPLATES.yukuhashi, SHINSEI.yukuhashi!, shinseiValues(job({insurer: 'yukuhashi', address: '福岡県行橋市見本1'}), yk));
   assert.equal(box(ykh, '住改・受領委任払', 'Z', 4), '4072601802');
@@ -2506,4 +2489,34 @@ test('大分市の施工業者担当欄は登録された担当者の携帯番�
   assert.match(contact('見本　 三郎'), /090-1234-5678/);
   assert.equal(contact(''), '担当者氏名（　見本 三郎　）　　連絡先（　090-1234-5678　）');
   assert.equal(contact('別の 担当'), '担当者氏名（　別の 担当　）　　連絡先（　097-504-8001　）');
+});
+
+test('北九州市の振込欄に施工業者の営業所に登録した口座だけを反映する', () => {
+  const j = kkJob();
+  const account = {institution: '見本銀行', branch: '見本支店', type: '普通', number: '0123456', holder: '見本法人', kana: 'ミホンホウジン', bankCode: '0010', branchCode: '010'};
+  const s = {...KK_S, applicationAccounts: {'小倉営業所': account, '大分営業所': {...account, number: '7654321'}}};
+  const out = sheets(fillShinsei(KITAKYUSHU, SHINSEI.kitakyushu!, shinseiBookValues(j, s)));
+  const at = (ref: string) => cellTexts(out.files)(out.byName.get('支給申請書')!, ref);
+  assert.deepEqual([at('AC81'), at('BM81'), at('BE94')], ['見本銀行', '見本支店', 'ミホンホウジン']);
+  assert.equal(['CJ81', 'CQ81', 'CT81', 'CX81', 'DC81', 'DJ81', 'DN81'].map(at).join(''), '0123456');
+  assert.equal(['AC92', 'AP92', 'AW92', 'BB92'].map(at).join(''), '0010');
+  const other = sheets(fillShinsei(OITA, SHINSEI.oita!, shinseiBookValues(otJob(), {...OT_S, applicationAccounts: {'小倉営業所': account}})));
+  assert.equal(cellTexts(other.files)(other.byName.get('支給申請兼施工承認申請書')!, 'AL46'), '');
+});
+
+test('広域連合の償還払いの口座欄には施工業者の振込先を転記しない', async () => {
+  const {applicationBankCells} = await import('../../src/sasaoka/applicationBank.ts');
+  const account = {institution: '見本銀行', branch: '見本支店', type: '普通', number: '0123456', holder: '見本法人', kana: 'ミホンホウジン'};
+  assert.equal(applicationBankCells('kouiki', '住宅改修費支給申請書（償還払い用）', account).values.size, 0);
+  assert.equal(applicationBankCells('kouiki', '様式第7号（住宅改修費支給申請書（受領委任払用）', account).values.get('O45'), 'ミホンホウジン');
+});
+
+test('行橋担当の保険者・広域連合の4市町では別営業所を指定しても行橋になる', async () => {
+  const {fixedApplicationOffice} = await import('../../src/sasaoka/shinseiOffice.ts');
+  const cases: [Insurer, string][] = [['kanda', ''], ['yukuhashi', ''], ['miyako', ''], ...['402149', '406470', '406421', '406462'].map((no): ['kouiki', string] => ['kouiki', no])];
+  for (const [insurer, insurerNo] of cases) {
+    const j = job({insurer, shinsei: {...NO_SHINSEI, insurerNo, builderOffice: '小倉南営業所'}});
+    assert.equal(fixedApplicationOffice(j), '行橋営業所');
+    assert.equal(shinseiBookValues(j, settingsForOffice(defaultSettings(), '大分営業所')).office?.name, '行橋営業所');
+  }
 });

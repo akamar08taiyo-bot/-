@@ -17,15 +17,17 @@ import {newPlace} from '../rows.ts';
 import {withSlots} from '../railSlots.ts';
 import {usePhotoUrls} from '../photos.ts';
 import {turn} from '../photoEdit.ts';
-import {AREA_LABEL, INSURER_AREAS, insurerNoOf} from '../insurerNumbers.ts';
+import {AREA_LABEL, INSURER_AREAS, insurerAreaName, insurerNoOf} from '../insurerNumbers.ts';
 import {photoBounds} from '../photoMarks.ts';
-import {autoLength, costIsTotal, lengthsShown, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiAutoOffice, shinseiCost, shinseiFileName, shinseiWorks} from '../shinsei.ts';
+import {autoLength, costIsTotal, lengthsShown, estimatePlateLength, insuredBoxes, padInsuredNo, photoDay, photoNoteLayout, photoNoteLines, photoPlacement, photoSheets, planPlacement, SHINSEI, shinseiAutoOffice, shinseiSettings, shinseiCost, shinseiFileName, shinseiWorks} from '../shinsei.ts';
 import {riyuOf, shinseiBookValues} from '../riyu.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, BankAccount, BuilderOffice, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
-import {builderChoices, builderOffice, primeKey, primeName} from '../shinseiOffice.ts';
+import {builderChoices, builderOffice, fixedApplicationOffice, primeKey, primeName, shinseiOfficeGroup} from '../shinseiOffice.ts';
 import type {Update} from '../useStore.ts';
+import {applicationNeedsAccount} from '../applicationBank.ts';
+import {OFFICES} from '../company.ts';
 import {defaultStaff} from '../lastStaff.ts';
 import {yen} from '../util.ts';
 import {addressOfZip, zipCandidates, zipLabel} from '../zip.ts';
@@ -148,9 +150,25 @@ export function ShinseiEditor({
   const insurer = jobInsurer(job);
   const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
-  const setupNeeded = !s.bank.trim() || !s.applicationStaff?.trim() || !s.applicationMobile?.trim();
+  const fixedOffice = fixedApplicationOffice(job);
+  const effectiveOffice = shinseiSettings(job, s).officeName.trim();
+  const area = insurerAreaName(insurer, insurerNoOf(insurer, job.address, info.insurerNo));
+  const officeGroup = shinseiOfficeGroup(insurer, area);
+  const officeChoices = fixedOffice ? [fixedOffice]
+    : officeGroup.length ? [...new Set([...officeGroup, effectiveOffice].filter(Boolean))]
+      : [...new Set([...OFFICES.map((o) => o.name), ...(s.builders ?? []).map((b) => b.name), effectiveOffice].filter(Boolean))];
+  const accountRequired = applicationNeedsAccount(insurer);
+  const kanaRequired = insurer === 'kitakyushu' || insurer === 'kouiki';
+  const savedOfficeAccount = (office: string) => s.applicationAccounts && Object.hasOwn(s.applicationAccounts, office) ? s.applicationAccounts[office] : undefined;
+  const currentAccount = savedOfficeAccount(effectiveOffice);
+  const setupNeeded = !s.applicationOffice || (accountRequired ? !currentAccount || (kanaRequired && !currentAccount.kana?.trim()) : !currentAccount && !s.bank.trim()) ||
+    !s.applicationStaff?.trim() || !s.applicationMobile?.trim();
   const [editingSetup, setEditingSetup] = useState(false);
-  const [setupDismissed, setSetupDismissed] = useState(false);
+  const [dismissedOffice, setDismissedOffice] = useState<string | null>(null);
+  const [draftOffice, setDraftOffice] = useState('');
+  const accountOffice = fixedOffice || (officeChoices.includes(draftOffice) ? draftOffice : effectiveOffice) || officeChoices[0] || '';
+  const officeAccount = savedOfficeAccount(accountOffice);
+  const sameOffice = accountOffice === s.officeName.trim();
   const applicationStaff = s.applicationStaff?.trim();
   useEffect(() => {
     if (DEMO || !applicationStaff || job.staff.trim()) return;
@@ -463,7 +481,7 @@ export function ShinseiEditor({
       case 'works':
         return <WorksEditor job={job} setJob={setJob} s={s} insurer={i} materials={data.materials} />;
       case 'builder':
-        if (!DEMO && i === 'oita') return <span data-field="builder">大分営業所</span>;
+        if (fixedOffice) return <span data-field="builder">{fixedOffice}</span>;
         return DEMO ? <PrimePick info={info} setInfo={setInfo} s={s} update={update} /> : <BuilderPick job={job} info={info} setInfo={setInfo} s={s} update={update} />;
       case 'cost':
         return (
@@ -595,27 +613,41 @@ export function ShinseiEditor({
           </>
         }
       />
-      {!DEMO && (editingSetup || (setupNeeded && !setupDismissed)) && (
+      {!DEMO && (editingSetup || (setupNeeded && dismissedOffice !== effectiveOffice)) && (
         <ApplicationSetup
-          bank={s.bank}
-          bankAccount={s.bankAccount}
+          key={accountOffice}
+          bank={officeAccount ? bankText(officeAccount) : sameOffice ? s.bank : ''}
+          bankAccount={officeAccount ?? (sameOffice ? s.bankAccount : undefined)}
+          accountOffice={accountOffice}
+          officeChoices={officeChoices}
+          onOffice={setDraftOffice}
+          requiresAccount={accountRequired}
+          allowNoBank={!accountRequired && !sameOffice && !!s.bank.trim()}
+          requiresKana={kanaRequired}
           staff={applicationStaff || job.staff || defaultStaff(s)}
           mobile={s.applicationMobile ?? ''}
           first={setupNeeded}
           onClose={() => {
-            setSetupDismissed(true);
+            setDismissedOffice(effectiveOffice);
             setEditingSetup(false);
+            setDraftOffice('');
           }}
           onSave={(bank, bankAccount, staff, mobile) => {
             update('settings', (prev) => ({
               ...prev,
-              bank,
-              bankAccount,
+              ...(sameOffice ? {bank, bankAccount} : {}),
+              ...(accountOffice && bankAccount ? {applicationAccounts: {...prev.applicationAccounts, [accountOffice]: bankAccount}} : {}),
+              applicationOffice: accountOffice,
               applicationStaff: staff,
               applicationMobile: mobile,
               staffList: prev.staffList.includes(staff) ? prev.staffList : [...prev.staffList, staff],
             }));
-            if (!applicationStaff || !job.staff.trim()) setJob((j) => ({...j, staff}));
+            setJob((j) => ({
+              ...j,
+              ...(!applicationStaff || !j.staff.trim() ? {staff} : {}),
+              ...(!fixedOffice && accountOffice ? {shinsei: {...NO_SHINSEI, ...j.shinsei, builderOffice: accountOffice}} : {}),
+            }));
+            setDraftOffice('');
             setEditingSetup(false);
             toast('共通情報を保存しました');
           }}
@@ -962,31 +994,40 @@ function InsurerAreaPick({insurer, address, picked, onPick, selectRef}: {insurer
 
 const NO_BUILDER: BuilderOffice = {name: '', company: '', jigyoshoNo: '', postal: '', address: '', tel: '', manager: ''};
 
-const EMPTY_BANK: BankAccount = {institution: '', branch: '', type: '', number: '', holder: ''};
+const EMPTY_BANK: BankAccount = {institution: '', branch: '', type: '', number: '', holder: '', kana: '', bankCode: '', branchCode: ''};
 const bankText = ({institution, branch, type, number, holder}: BankAccount) =>
   [institution, branch, type, number, holder].map((v) => v.trim()).join(' ');
 
 function ApplicationSetup({
-  bank, bankAccount, staff: initialStaff, mobile: initialMobile, first, onClose, onSave,
+  bank, bankAccount, accountOffice, officeChoices, onOffice, requiresAccount, allowNoBank, requiresKana, staff: initialStaff, mobile: initialMobile, first, onClose, onSave,
 }: {
   bank: string;
   bankAccount?: BankAccount;
+  accountOffice: string;
+  officeChoices: string[];
+  onOffice: (office: string) => void;
+  requiresAccount: boolean;
+  allowNoBank: boolean;
+  requiresKana: boolean;
   staff: string;
   mobile: string;
   first: boolean;
   onClose: () => void;
   onSave: (bank: string, account: BankAccount | undefined, staff: string, mobile: string) => void;
 }) {
-  const savedAccount = bankAccount && bankText(bankAccount) === bank.trim() ? bankAccount : undefined;
+  const savedAccount = bankAccount && (!bank.trim() || bankText(bankAccount) === bank.trim()) ? bankAccount : undefined;
   const [account, setAccount] = useState(savedAccount ?? EMPTY_BANK);
   const setBankField = (key: keyof BankAccount, value: string) => setAccount((prev) => ({...prev, [key]: value}));
   const number = account.number.normalize('NFKC').trim();
-  const bankComplete = !!account.institution.trim() && !!account.branch.trim() && !!account.type && /^\d+$/.test(number) && !!account.holder.trim();
-  const keepLegacy = !!bank.trim() && !savedAccount && Object.values(account).every((value) => !value.trim());
+  const bankCode = (account.bankCode ?? '').normalize('NFKC').trim();
+  const branchCode = (account.branchCode ?? '').normalize('NFKC').trim();
+  const bankComplete = !!account.institution.trim() && !!account.branch.trim() && !!account.type &&
+    /^\d{1,7}$/.test(number) && !!account.holder.trim() && (!requiresKana || !!account.kana?.trim()) && (!bankCode || /^\d{4}$/.test(bankCode)) && (!branchCode || /^\d{3}$/.test(branchCode));
+  const keepLegacy = !requiresAccount && (!!bank.trim() || allowNoBank) && !savedAccount && Object.values(account).every((value) => !value?.trim());
   const [staff, setStaff] = useState(initialStaff);
   const [mobile, setMobile] = useState(initialMobile);
   const mobileDigits = mobile.normalize('NFKC').replace(/[\s-]/g, '');
-  const canSave = (bankComplete || keepLegacy) && !!staff.trim() && /^0[6-9]0\d{8}$/.test(mobileDigits);
+  const canSave = !!accountOffice && (bankComplete || keepLegacy) && !!staff.trim() && /^0[6-9]0\d{8}$/.test(mobileDigits);
 
   return (
     <form
@@ -995,16 +1036,22 @@ function ApplicationSetup({
       onSubmit={(e) => {
         e.preventDefault();
         if (!canSave) return;
-        const nextAccount = bankComplete ? {...account, number} : undefined;
+        const nextAccount = bankComplete ? {...account, number, bankCode, branchCode, kana: account.kana?.trim()} : undefined;
         onSave(nextAccount ? bankText(nextAccount) : bank.trim(), nextAccount, staff.trim(), telWithHyphens(mobileDigits));
       }}
     >
       <h2 className="font-bold text-emerald-900">{first ? '共通情報の初回登録' : '共通情報の変更'}</h2>
-      <p className="text-sm text-slate-700">入力は初回のみです。担当者名と携帯番号は次回以降も引き継ぎます。お振込先は工務店請求書に反映します。</p>
+      <p className="text-sm text-slate-700">入力は初回のみです。担当者名と携帯番号は次回以降も引き継ぎます。対応する申請書には、施工業者の営業所に登録したお振込先を反映します。</p>
+      <label className="grid max-w-xs gap-1 text-sm font-bold text-slate-700">
+        営業所名
+        <select aria-label="営業所名" value={accountOffice} onChange={(e) => onOffice(e.target.value)} disabled={officeChoices.length === 1} className="h-9 rounded-md border border-slate-300 bg-white px-2">
+          {officeChoices.map((office) => <option key={office} value={office}>{office}</option>)}
+        </select>
+      </label>
       <fieldset className="rounded-md border border-emerald-200 p-3">
-        <legend className="px-1 text-sm font-bold text-emerald-900">お振込先</legend>
+        <legend className="px-1 text-sm font-bold text-emerald-900">{accountOffice ? `${accountOffice}のお振込先` : 'お振込先'}</legend>
         {bank.trim() && !savedAccount && (
-          <p className="mb-2 break-words text-sm text-slate-700">登録済みのお振込先　{bank}。空欄のまま保存すると、この振込先を引き継ぎます。</p>
+          <p className="mb-2 break-words text-sm text-slate-700">登録済みのお振込先　{bank}。{requiresAccount ? '申請書に反映するには、以下の欄に口座情報を登録してください。' : '空欄のまま保存すると、この振込先を引き継ぎます。'}</p>
         )}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <label className="grid gap-1 text-sm font-bold text-slate-700">
@@ -1031,6 +1078,18 @@ function ApplicationSetup({
           <label className="grid gap-1 text-sm font-bold text-slate-700 lg:col-span-2">
             口座名義
             <TextInput value={account.holder} onChange={(value) => setBankField('holder', value)} />
+          </label>
+          <label className="grid gap-1 text-sm font-bold text-slate-700">
+            口座名義カナ
+            <TextInput value={account.kana ?? ''} required={requiresKana} onChange={(value) => setBankField('kana', value)} placeholder="通帳に記載のカナ" />
+          </label>
+          <label className="grid gap-1 text-sm font-bold text-slate-700">
+            金融機関コード
+            <TextInput inputMode="numeric" value={account.bankCode ?? ''} onChange={(value) => setBankField('bankCode', value)} placeholder="4桁" />
+          </label>
+          <label className="grid gap-1 text-sm font-bold text-slate-700">
+            支店コード
+            <TextInput inputMode="numeric" value={account.branchCode ?? ''} onChange={(value) => setBankField('branchCode', value)} placeholder="3桁" />
           </label>
         </div>
       </fieldset>

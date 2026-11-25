@@ -6,6 +6,8 @@
 // 事後申請書など、転記した欄を参照する式は、Excel で開いたときに計算し直す（保存しておく答えも同じ値にしておく）。
 // 書き込んだ申請書（Excel）から 氏名・住所・被保険者番号・改修の箇所・改修費用 を読むこともできる（readShinseiBook。一覧の「📥 取り込む」＝importDocs.ts）。
 
+import {applicationBankCells} from './applicationBank.ts';
+import type {BankAccount} from './types.ts';
 import {strFromU8, strToU8, unzipSync, zipSync} from 'fflate';
 import {estimateTotals, isBlankRow} from './calc.ts';
 import type {EstimateRates, EstimateSettings} from './calc.ts';
@@ -17,7 +19,7 @@ import {circled, eraOf, formLines, INSURER_INFO, jobInsurer, KINDS, lineNote, MA
 import {COMPANY_NAME, OFFICES, ORIGINAL_OFFICE_TEXTS} from './company.ts';
 import {insurerAreaName, insurerNoOf} from './insurerNumbers.ts';
 import {DEMO} from './demo/flag.ts';
-import {builderOffice, shinseiOfficeName, withBuilder, withPrime} from './shinseiOffice.ts';
+import {builderOffice, fixedApplicationOffice, shinseiOfficeName, withBuilder, withPrime} from './shinseiOffice.ts';
 import {readyLengths} from './railSlots.ts';
 import {clampOff, clampScale, normRot} from './photoEdit.ts';
 import {BOARD_PTS, frontOrder, lineEnds, MARK_INSET, photoBounds, shapeBox} from './photoMarks.ts';
@@ -1106,6 +1108,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
 /** 改修の種類（①手すりの取り付け〜⑥付帯工事）ごとの 箇所（玄関・トイレ）と工事内容の行 */
 export type ShinseiKind = {places: string; works: string[]};
 export type ShinseiValues = {
+  applicationBank?: {insurer: Insurer; account: BankAccount};
   name: string;
   address: string;
   insuredNo: string;
@@ -1540,7 +1543,7 @@ function proxyAmount(benefit: number): string {
 }
 
 /** 改修施工者（受任者。福岡市の申請書）に書く会社・営業所（住宅改修のアプリの設定。請求書の発行元と同じ） */
-export type BuilderSettings = Partial<Pick<Settings, 'company' | 'officeName' | 'manager' | 'postal' | 'address' | 'tel' | 'entrustRegNo' | 'builders' | 'applicationStaff' | 'applicationMobile'>> & {builderKey?: string};
+export type BuilderSettings = Partial<Pick<Settings, 'company' | 'officeName' | 'manager' | 'postal' | 'address' | 'tel' | 'entrustRegNo' | 'builders' | 'applicationStaff' | 'applicationMobile' | 'applicationAccounts' | 'applicationOffice'>> & {builderKey?: string};
 
 /**
  * 番号を様式の「－」で分けた欄に分ける（北九州市の郵便番号「〒802－0001」・電話番号「093－000－0000」）：「-」で区切られていればその区切り、
@@ -1570,15 +1573,16 @@ function reiwaParts(iso: string): [string, string, string] {
 export function shinseiSettings<T extends BuilderSettings>(job: Job, s: T): T {
   // （株）イヤーズ デモアプリは下請けなので、施工業者は選んだ元請け（shinseiOffice.ts の withPrime。2026-11-12）
   if (DEMO) return withPrime(s, job.shinsei?.builderOffice ?? '');
-  if (jobInsurer(job) === 'oita') {
-    const office = OFFICES.find((o) => o.name === '大分営業所');
+  const fixedOffice = fixedApplicationOffice(job);
+  if (fixedOffice) {
+    const office = OFFICES.find((o) => o.name === fixedOffice);
     if (office) return {...s, company: COMPANY_NAME, officeName: office.name, builderKey: office.name, manager: office.manager, postal: office.postal, address: office.address, tel: office.tel};
   }
   const current = (s.officeName ?? '').trim();
   // 申請書の画面で施工業者を選んでいれば、その営業所（ユーザーの指示「施工業者名は…行橋、小倉南、小倉、八幡東、八幡西にする。それぞれリストから選択、
   // 追加もできる」2026-11-11）。足した営業所は会社名も（入れていれば）
   // 設定の営業所のままなら、設定の所長・住所（設定の画面で直したもの）を使う。替えるときだけ営業所の一覧から（withBuilder）
-  return withBuilder(s, (job.shinsei?.builderOffice ?? '').trim() || shinseiAutoOffice(job, current));
+  return withBuilder(s, (job.shinsei?.builderOffice ?? '').trim() || shinseiAutoOffice(job, current) || s.applicationOffice || '');
 }
 
 /** 施工業者を選んでいないときの営業所：保険者（と区・市町村）の営業所。決まりのない保険者は空（設定の営業所のまま） */
@@ -1623,7 +1627,11 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
   const careNo = (head: string) => (info.care.startsWith(head) ? zen(info.care.slice(head.length)) : '');
   const rShort = (iso: string) => ((r) => (r ? `R${r.y}・${r.m}・${r.d}` : 'R　・　・'))(reiwa(iso));
   const term = !!(info.careFrom || info.careTo);
+  const insurer = jobInsurer(job);
+  const account = !DEMO && s.officeName && settings.applicationAccounts && Object.hasOwn(settings.applicationAccounts, s.officeName)
+    ? settings.applicationAccounts[s.officeName] : undefined;
   return {
+    ...(insurer && account ? {applicationBank: {insurer, account}} : {}),
     name: job.customer.trim(),
     address: job.address.trim(),
     insuredNo: job.insuredNo,
@@ -2072,6 +2080,10 @@ export function shinseiCells(sheet: ShinseiSheet, v: ShinseiValues, photo = 0): 
     const value = textValue(t, v);
     if (value !== null) out.set(t.cell, value);
   }
+  if (v.applicationBank) {
+    const {values} = applicationBankCells(v.applicationBank.insurer, sheet.sheet, v.applicationBank.account);
+    for (const [ref, value] of values) out.set(ref, value);
+  }
   return out;
 }
 
@@ -2274,10 +2286,15 @@ export function fillFiles(files: Files, map: ShinseiMap, v: ShinseiValues): void
     wrapKinds(files, sheet, v);
     fitLines(files, sheet, v);
     packKindCells(files, sheet, v);
-    fitTexts(files, sheet, cells, copies);
+    const bank = v.applicationBank && applicationBankCells(v.applicationBank.insurer, sheet.sheet, v.applicationBank.account);
+    const fittedSheet = bank?.spillTo
+      ? {...sheet, spillTo: {...sheet.spillTo, ...bank.spillTo}, oneLine: [...(sheet.oneLine ?? []), ...Object.keys(bank.spillTo)]}
+      : sheet;
+    fitTexts(files, fittedSheet, cells, copies);
     if (sheet.enlarge && cells.has(sheet.enlarge.cell)) enlargeCell(files, sheet.sheet, sheet.enlarge);
     fitCheckRows(files, sheet);
-    drawMarks(files, sheet, v.marks);
+    const bankMark = bank?.mark;
+    drawMarks(files, bankMark ? {...sheet, marks: [...(sheet.marks ?? []), FIXED(bankMark[0], [bankMark[1]])]} : sheet, v.marks);
     if (sheet.photoPlace?.kindCircles) drawKindCircle(files, sheet, photo > 0 && v.photos[photo] !== undefined ? (v.photoKinds?.[photo] ?? 0) : 0);
     if (sheet.legend?.box) drawLegend(files, sheet, v.works);
     // 写真の報告書の改修の内容（北九州市のメモの欄。大きな字でまん中）：入らなければ1行ずつ欄の幅に入る大きさにする

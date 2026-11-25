@@ -3,12 +3,10 @@
 
 import {COMPANY_NAME} from '../company.ts';
 import {settingsForOffice} from '../defaults.ts';
-import {DEMO} from '../demo/flag.ts';
-import {jobInsurer} from '../estimateForms.ts';
 import type {EstimateTotals} from '../calc.ts';
 import type {Job, Settings} from '../types.ts';
 import {staffFull} from '../util.ts';
-import {withBuilder} from '../shinseiOffice.ts';
+import {fixedApplicationOffice, withBuilder} from '../shinseiOffice.ts';
 
 // ================================================================ 苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」
 // 列 A〜M の幅（mm）。A 改修内容／B 改修場所（写真No.）／C 内容（規格・範囲）／D・E 数量と単位／F 単価／G 金額／
@@ -16,9 +14,7 @@ import {withBuilder} from '../shinseiOffice.ts';
 export const YK = {A: 31.1, B: 24.9, C: 48.1, D: 7.1, E: 7.1, F: 15.5, G: 22.3, H: 7.1, I: 7.1, J: 15.5, K: 25.2, L: 22.9, M: 32.2};
 export const YK_ROW = 5.77; // 明細の1行（元の 16.35pt）
 
-export function fixedEstimateOffice(job: Pick<Job, 'insurer' | 'form' | 'address'>): string {
-  return !DEMO && jobInsurer(job) === 'oita' ? '大分営業所' : '';
-}
+export {fixedApplicationOffice as fixedEstimateOffice};
 
 /**
  * 苅田町・行橋市・みやこ町用の右上の施工業者（1ページ目だけ）。申請書の画面で施工業者を選んだ様邸は、その営業所（申請書と同じ。
@@ -26,13 +22,13 @@ export function fixedEstimateOffice(job: Pick<Job, 'insurer' | 'form' | 'address
  * 大分市の見積書は営業所マスタの大分営業所で固定する。それ以外で施工業者を選んでいなければ設定の営業所を使う。
  */
 export function issuerLines(job: Pick<Job, 'staff' | 'insurer' | 'form' | 'address' | 'shinsei'>, settings: Settings): string[] {
-  const office = fixedEstimateOffice(job);
+  const office = fixedApplicationOffice(job);
   const s = office ? settingsForOffice({...settings, company: COMPANY_NAME}, office) : withBuilder(settings, job.shinsei?.builderOffice ?? '');
   return [
     `住　　　所　${s.address}`,
     `施工業者名　${s.company.replace('株式会社', '(株)')}${s.officeName}`,
     `代表者名　${s.officeName}所長　${s.manager}`,
-    office ? `電話番号　${s.tel}` : `担当者・電話番号　担当： ${staffFull(job.staff, s.staffList) || s.person}　${s.tel}`,
+    office === '大分営業所' ? `電話番号　${s.tel}` : `担当者・電話番号　担当： ${staffFull(job.staff, s.staffList) || s.person}　${s.tel}`,
   ];
 }
 
