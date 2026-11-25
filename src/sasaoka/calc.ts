@@ -263,12 +263,13 @@ export function estimateQty(row: Row): number {
  */
 export function estimateAmount(row: Row, rates: EstimateRates): number {
   const qty = Number.isFinite(row.qty) ? row.qty : 0;
+  const round = row.estRound ? roundYen : rounddown;
   if (row.kind === 'labor') {
-    if (row.estPrice !== null && Number.isFinite(row.estPrice)) return rounddown(row.estPrice * qty);
+    if (row.estPrice !== null && Number.isFinite(row.estPrice)) return round(row.estPrice * qty);
     return Number.isFinite(row.price) ? rounddown(row.price * qty * rates.estimateLaborRate) : 0;
   }
   const unit = estimateUnitPrice(row, rates);
-  return rounddown(cutToLength(row) ? (unit * qty * row.lengthCm) / 100 / row.pieceLengthM : unit * qty);
+  return round(cutToLength(row) ? (unit * qty * row.lengthCm) / 100 / row.pieceLengthM : unit * qty);
 }
 
 export type EstimateLine =
