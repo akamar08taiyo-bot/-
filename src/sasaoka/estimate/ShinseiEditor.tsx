@@ -148,7 +148,7 @@ export function ShinseiEditor({
   const insurer = jobInsurer(job);
   const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
-  const setupNeeded = !s.bank.trim() || !s.applicationStaff?.trim();
+  const setupNeeded = !s.bank.trim() || !s.applicationStaff?.trim() || !s.applicationMobile?.trim();
   const [editingSetup, setEditingSetup] = useState(false);
   const [setupDismissed, setSetupDismissed] = useState(false);
   const applicationStaff = s.applicationStaff?.trim();
@@ -599,19 +599,21 @@ export function ShinseiEditor({
         <ApplicationSetup
           bank={s.bank}
           staff={applicationStaff || job.staff || defaultStaff(s)}
+          mobile={s.applicationMobile ?? ''}
           first={setupNeeded}
           onClose={() => {
             setSetupDismissed(true);
             setEditingSetup(false);
           }}
-          onSave={(bank, staff) => {
+          onSave={(bank, staff, mobile) => {
             update('settings', (prev) => ({
               ...prev,
               bank,
               applicationStaff: staff,
+              applicationMobile: mobile,
               staffList: prev.staffList.includes(staff) ? prev.staffList : [...prev.staffList, staff],
             }));
-            if (setupNeeded) setJob((j) => ({...j, staff}));
+            if (!applicationStaff || !job.staff.trim()) setJob((j) => ({...j, staff}));
             setEditingSetup(false);
             toast('共通情報を保存しました');
           }}
@@ -959,27 +961,32 @@ function InsurerAreaPick({insurer, address, picked, onPick, selectRef}: {insurer
 const NO_BUILDER: BuilderOffice = {name: '', company: '', jigyoshoNo: '', postal: '', address: '', tel: '', manager: ''};
 
 function ApplicationSetup({
-  bank: initialBank, staff: initialStaff, first, onClose, onSave,
+  bank: initialBank, staff: initialStaff, mobile: initialMobile, first, onClose, onSave,
 }: {
   bank: string;
   staff: string;
+  mobile: string;
   first: boolean;
   onClose: () => void;
-  onSave: (bank: string, staff: string) => void;
+  onSave: (bank: string, staff: string, mobile: string) => void;
 }) {
   const [bank, setBank] = useState(initialBank);
   const [staff, setStaff] = useState(initialStaff);
+  const [mobile, setMobile] = useState(initialMobile);
+  const mobileDigits = mobile.normalize('NFKC').replace(/[\s-]/g, '');
+  const canSave = !!bank.trim() && !!staff.trim() && /^0[6-9]0\d{8}$/.test(mobileDigits);
+
   return (
     <form
       aria-label={first ? '共通情報の初回登録' : '共通情報の変更'}
       className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3"
       onSubmit={(e) => {
         e.preventDefault();
-        if (bank.trim() && staff.trim()) onSave(bank.trim(), staff.trim());
+        if (canSave) onSave(bank.trim(), staff.trim(), telWithHyphens(mobileDigits));
       }}
     >
       <h2 className="font-bold text-emerald-900">{first ? '共通情報の初回登録' : '共通情報の変更'}</h2>
-      <p className="text-sm text-slate-700">入力は初回のみです。登録した担当者名は次回の申請書に、お振込先は工務店請求書に反映します。</p>
+      <p className="text-sm text-slate-700">入力は初回のみです。担当者名と携帯番号は次回以降も引き継ぎます。お振込先は工務店請求書に反映します。</p>
       <div className="flex flex-wrap gap-3">
         <label className="grid min-w-[13rem] flex-1 gap-1 text-sm font-bold text-slate-700">
           金融機関・お振込先
@@ -989,9 +996,13 @@ function ApplicationSetup({
           担当者名
           <TextInput value={staff} onChange={setStaff} required />
         </label>
+        <label className="grid gap-1 text-sm font-bold text-slate-700">
+          担当者携帯番号
+          <TextInput type="tel" value={mobile} onChange={setMobile} required placeholder="携帯番号（11桁）" />
+        </label>
       </div>
       <div className="flex gap-2">
-        <Btn type="submit" color="emerald" disabled={!bank.trim() || !staff.trim()}>保存する</Btn>
+        <Btn type="submit" color="emerald" disabled={!canSave}>保存する</Btn>
         <Btn color="white" onClick={onClose}>{first ? 'あとで登録' : '閉じる'}</Btn>
       </div>
     </form>

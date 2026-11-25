@@ -2495,3 +2495,15 @@ test('大分市の工事見積書とExcelは営業所マスタの大分営業所
   assert.ok(values.some((value) => value.includes(j.customer)));
   assert.ok(values.some((value) => value.includes(j.address)));
 });
+
+test('大分市の施工業者担当欄は登録された担当者の携帯番号を再利用する', () => {
+  const settings = {...OT_S, applicationStaff: '見本 三郎', applicationMobile: '09012345678'};
+  const contact = (staff: string) => {
+    const j = otJob({staff});
+    const book = fillShinsei(OITA, SHINSEI.oita!, shinseiBookValues(j, settings));
+    return txt(sheets(book).byName.get('支給申請兼施工承認申請書')!, 'M64');
+  };
+  assert.match(contact('見本　 三郎'), /090-1234-5678/);
+  assert.equal(contact(''), '担当者氏名（　見本 三郎　）　　連絡先（　090-1234-5678　）');
+  assert.equal(contact('別の 担当'), '担当者氏名（　別の 担当　）　　連絡先（　097-504-8001　）');
+});

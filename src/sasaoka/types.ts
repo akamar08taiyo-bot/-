@@ -392,6 +392,7 @@ export type Settings = {
   staffList: string[]; // 担当者の候補（様邸ごとに選ぶ）
   // 最後に選んだ担当。新規作成の様邸の担当の初めの値（ユーザーの指示「担当名は一度入力したら、次から同じ名前がデフォルトにする」2026-11-12）
   lastStaff?: string;
+  applicationMobile?: string; // 共通情報に登録した担当者の携帯番号
   applicationStaff?: string; // 住宅改修申請書で初回に登録した既定の担当者
   // ---- 見積書
   estimateRate: number; // 見積の部材の単価＝定価×この率（0.8）

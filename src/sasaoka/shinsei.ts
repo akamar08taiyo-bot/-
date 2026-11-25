@@ -163,6 +163,7 @@ export type ShinseiTexts = Record<
   | 'builderZip'
   | 'builderAddress'
   | 'builderTel'
+  | 'staffContactTel'
   | 'builderRep'
   // 北九州市：郵便番号・電話番号は様式の「－」の前と後ろに分けて書く（3つ・2つ）。施工業者の担当者名、写真の報告書の被保険者番号（1つの欄）、
   // 支給予定金額・申請金額（保険給付額。委任状の benefit とちがって数字だけ）
@@ -1060,7 +1061,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T('M60', '{reasonOffice}'),
           T('M61', '担当者氏名（　{reasonName}　）　　連絡先（　{reasonTel}　）'),
           T('M63', '{builder}'),
-          T('M64', '担当者氏名（　{manager}　）　　連絡先（　{builderTel}　）'),
+          T('M64', '担当者氏名（　{manager}　）　　連絡先（　{staffContactTel}　）'),
         ],
       },
       {
@@ -1539,7 +1540,7 @@ function proxyAmount(benefit: number): string {
 }
 
 /** 改修施工者（受任者。福岡市の申請書）に書く会社・営業所（住宅改修のアプリの設定。請求書の発行元と同じ） */
-export type BuilderSettings = Partial<Pick<Settings, 'company' | 'officeName' | 'manager' | 'postal' | 'address' | 'tel' | 'entrustRegNo' | 'builders'>> & {builderKey?: string};
+export type BuilderSettings = Partial<Pick<Settings, 'company' | 'officeName' | 'manager' | 'postal' | 'address' | 'tel' | 'entrustRegNo' | 'builders' | 'applicationStaff' | 'applicationMobile'>> & {builderKey?: string};
 
 /**
  * 番号を様式の「－」で分けた欄に分ける（北九州市の郵便番号「〒802－0001」・電話番号「093－000－0000」）：「-」で区切られていればその区切り、
@@ -1605,6 +1606,13 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
   const postal = t(s.postal ?? '');
   // 会社の電話も、設定にハイフンなしで入れてあれば分けて書く（久留米市の「℡（0942）72－8822」。前は「℡（0942728822）－」になった）
   const builderTel = telWithHyphens(t(s.tel ?? ''));
+  const registeredStaff = DEMO ? '' : (settings.applicationStaff ?? '').trim();
+  const staffName = job.staff.trim() || registeredStaff;
+  const nameKey = (name: string) => name.normalize('NFKC').replace(/\s+/g, '');
+  const staffContactTel = registeredStaff && nameKey(staffName) === nameKey(registeredStaff)
+    ? telWithHyphens((settings.applicationMobile ?? '').trim()) || builderTel
+    : builderTel;
+
   const [builderTelA, builderTelB, builderTelC] = splitNumber(builderTel, 3);
   const care = shinseiCare(job, s);
   const benefit = care.benefit;
@@ -1666,6 +1674,7 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
       builderZip: t(s.postal ?? ''),
       builderAddress: (s.address ?? '').trim(),
       builderTel,
+      staffContactTel,
       // 代表者氏名：「所長　氏名」（特定福祉用具の申請書と同じ）。前は請求書と同じ「○○営業所所長　氏名」にしていたが、すぐ上（左）の名称に営業所があり、
       // 北九州市の事前届出書の代表者名の狭い欄で字がとても小さくなった（ユーザーの指示「委任状の…社長名…はみ出し…文字が極端に小さくなってないか」2026-11-02）
       builderRep: s.manager?.trim() ? `所長　${s.manager.trim()}` : '',
@@ -1680,7 +1689,7 @@ export function shinseiValues(job: Job, settings: EstimateSettings & BuilderSett
       builderTelA,
       builderTelB,
       builderTelC,
-      manager: job.staff.trim() || (s.manager ?? '').trim(), // 施工業者の担当者名：様邸の担当（なければ設定の所長）
+      manager: staffName || (s.manager ?? '').trim(), // 施工業者の担当者名：様邸の担当（なければ設定の所長）
       bizNo: builderOffice(s.builderKey ?? s.officeName ?? '', s.builders)?.jigyoshoNo ?? '',
       insured: padInsuredNo(job.insuredNo),
       benefitYen: benefit > 0 ? benefit.toLocaleString('en-US') : '',
@@ -2164,6 +2173,7 @@ export const EMPTY_SHINSEI: ShinseiValues = {
     builderZip: '',
     builderAddress: '',
     builderTel: '',
+    staffContactTel: '',
     builderRep: '',
     zipA: '',
     zipB: '',

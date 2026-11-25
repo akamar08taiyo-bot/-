@@ -215,6 +215,7 @@ const TEXT_FIELD: Record<keyof ShinseiTexts, ShinseiField> = {
   builderZip: 'builder',
   builderAddress: 'builder',
   builderTel: 'builder',
+  staffContactTel: 'builder',
   builderRep: 'builder',
   // 北九州市：「－」の前と後ろに分けた郵便番号・電話番号、写真の報告書の被保険者番号、支給予定金額（保険給付額）は負担割合へ
   zipA: 'zip',
