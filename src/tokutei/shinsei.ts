@@ -9,7 +9,7 @@ import {insurerAreaName, insurerNoOf} from './insurerNumbers.ts';
 import {shinseiOfficeName} from './shinseiOffice.ts';
 import {saleTotals} from './calc.ts';
 import {CATEGORIES, docLabel} from './category.ts';
-import {CARE_LEVELS, OFFICES} from './defaults.ts';
+import {CARE_LEVELS, isOitaSale, OFFICES, oitaIssuerSettings} from './defaults.ts';
 import type {CarePlan, Gender, PayMethod, Sale, Settings} from './types.ts';
 import {warekiLabel, warekiOf} from './wareki.ts';
 import type {Wareki} from './wareki.ts';
@@ -129,6 +129,10 @@ export function corpShort(name: string): string {
  * 替えるときは営業所の一覧の所長・住所・電話と、その営業所の事業者番号（申請書の画面で入れた providerNos。なければ一覧の番号、分からなければ空。ほかの営業所の番号を書かない）
  */
 export function shinseiSettings(sale: Pick<Sale, 'insurer' | 'address' | 'insurerNo'>, s: Settings): Settings {
+  if (isOitaSale(sale)) {
+    const oita = oitaIssuerSettings(s);
+    return {...oita, providerNo: s.providerNos?.[oita.officeName] ?? (s.officeName === oita.officeName ? s.providerNo || oita.providerNo : oita.providerNo)};
+  }
   const current = s.officeName.trim();
   const area = insurerAreaName(sale.insurer, insurerNoOf(sale.insurer, sale.address, sale.insurerNo ?? ''));
   const name = shinseiOfficeName(sale.insurer, area, current);

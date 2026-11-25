@@ -15,7 +15,7 @@
 import {strFromU8, strToU8} from 'fflate';
 import {itemNote, saleTotals} from './calc.ts';
 import type {Totals} from './calc.ts';
-import {OFFICES} from './defaults.ts';
+import {isOitaSale, OFFICES, oitaIssuerSettings} from './defaults.ts';
 import {customerName, withoutBlankItems} from './sales.ts';
 import {sheetPreviewPages} from './shinseiPreview.ts';
 import type {PvPage, Range} from './shinseiPreview.ts';
@@ -260,7 +260,9 @@ export const TITLE_PT = 26;
 export const NAME_PT = 20;
 
 /** 原本（開いたもの）の写しに案件を書く。書いたブック（files をそのまま書きかえる） */
-export function fillEstimateFiles(files: Files, all: Sale, s: Settings): void {
+export function fillEstimateFiles(files: Files, all: Sale, settings: Settings): void {
+  const oita = isOitaSale(all);
+  const s = oita ? oitaIssuerSettings(settings) : settings;
   const sale = withoutBlankItems(all); // 何も入れていない商品の欄は書かない
   const t = saleTotals(sale, s);
   const path = sheetPath(files, ESTIMATE_SHEET);
@@ -296,7 +298,7 @@ export function fillEstimateFiles(files: Files, all: Sale, s: Settings): void {
   const fax = of(s.fax, office?.fax);
   if (fax) put('I14', `FAX：${fax}`);
   if (s.regNo.trim()) put('I15', `登録番号：${s.regNo.trim()}`);
-  put('I16', sale.staff.trim() ? `担当：${sale.staff.trim()}` : '');
+  put('I16', !oita && sale.staff.trim() ? `担当：${sale.staff.trim()}` : '');
   put('B14', ESTIMATE_SUBJECT);
   // 明細の品名の欄の書式は、どの行も1行目と同じにする（原本は2行目が10pt・3行目が赤の太字14pt＝書いた例の名残り。いちばん下の行は下の罫線がちがうのでそのまま）
   for (const c of ['A', 'B', 'C', 'D', 'E']) {

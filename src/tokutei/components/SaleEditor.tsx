@@ -1,7 +1,7 @@
 import {useCallback, useDeferredValue, useEffect, useMemo, useRef, useState} from 'react';
 import type {FocusEvent, MouseEvent} from 'react';
 import {saleTotals} from '../calc.ts';
-import {insurerLabel} from '../defaults.ts';
+import {insurerLabel, isOitaSale} from '../defaults.ts';
 import {HACCHU_IMPORT_KEY, hacchuImport, hacchuUrl, queueHacchu, unqueueHacchu} from '../handoff.ts';
 import {blankItem, rememberFavorites, copySale, customerLabel, customerPatch, itemFromProduct, makerChoices, markUsed, sameYearSales, saleWarnings, unregisteredItems, withoutBlankItems} from '../sales.ts';
 import {shinseiForm, shinseiValues} from '../shinsei.ts';
@@ -131,9 +131,9 @@ export function SaleEditor({
     const out = new Set<EstimateField>();
     if (!sale.customer.trim()) out.add('customer');
     if (sale.items.length === 0) out.add('items');
-    if (!sale.staff) out.add('staff');
+    if (!isOitaSale(sale) && !sale.staff) out.add('staff');
     return out;
-  }, [sale.customer, sale.items.length, sale.staff]);
+  }, [sale.customer, sale.items.length, sale.insurer, sale.staff]);
   const [estActive, setEstActive] = useState<EstimateField | null>(null);
   const quoteRef = useRef<HTMLDivElement>(null);
   const estBox = useRef<HTMLElement>(null);

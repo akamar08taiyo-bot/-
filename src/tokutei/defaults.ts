@@ -1,6 +1,17 @@
 // 初期値：営業所・担当者・保険者・設定。住宅改修 見積書アプリ（src/sasaoka/defaults.ts）・販売受注簿作成ツールと同じ値にそろえる
 
-import type {Office, Settings} from './types.ts';
+import type {Office, Sale, Settings} from './types.ts';
+
+const COMPANY_NAME = '太陽シルバーサービス株式会社';
+const REG_NO = 'T1290001044462';
+
+export function isOitaSale(sale: Pick<Sale, 'insurer'>): boolean {
+  return sale.insurer === 'oita';
+}
+
+export function oitaIssuerSettings(s: Settings): Settings {
+  return settingsForOffice({...s, company: COMPANY_NAME, regNo: REG_NO}, '大分営業所');
+}
 
 /**
  * 営業所（見積書の発行元）。住宅改修 見積書アプリの一覧と同じ。providerNo は介護保険の事業所番号（10けた。チラシ作成（レンタル）taiyo-chirashi の
@@ -84,7 +95,7 @@ export const SETTINGS_REV = 1;
 
 export function defaultSettings(): Settings {
   const base: Settings = {
-    company: '太陽シルバーサービス株式会社',
+    company: COMPANY_NAME,
     officeName: '',
     postal: '',
     address: '',
@@ -92,7 +103,7 @@ export function defaultSettings(): Settings {
     fax: '',
     manager: '',
     // 販売受注簿作成ツール・住宅改修 見積書アプリと同じ登録番号
-    regNo: 'T1290001044462',
+    regNo: REG_NO,
     entrustRegNo: '', // 久留米市の受領委任払取扱事業所登録番号（市から届く8けた。設定で入れる）
     staffList: DEFAULT_STAFF,
     suppliers: DEFAULT_SUPPLIERS,

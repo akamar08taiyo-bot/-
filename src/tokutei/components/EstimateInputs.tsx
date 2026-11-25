@@ -7,7 +7,7 @@ import {useMemo, useState} from 'react';
 import type {FocusEvent, ReactNode, RefObject} from 'react';
 import {basisNote, categoryTaxPatch, lineOf} from '../calc.ts';
 import type {Line, Totals} from '../calc.ts';
-import {CARE_LEVELS, INSURERS} from '../defaults.ts';
+import {CARE_LEVELS, INSURERS, isOitaSale} from '../defaults.ts';
 import {showsSelfPay, userBurdenLine} from '../estimateBook.ts';
 import type {EstimateField} from '../estimateBook.ts';
 import {blankItem, makerChoices, suggestValues, unregisteredItems} from '../sales.ts';
@@ -109,7 +109,7 @@ export function EstimateInputs({
         )}
         {/* 見積番号・見積日・担当は1行に（ユーザーの指示「４行は長いので、２行にする」2026-11-03。宛名と合わせて2行）。欄ごとに data-field（プレビューを押すとその欄へ） */}
         {row(
-          '見積番号・見積日・担当',
+          isOitaSale(sale) ? '見積番号・見積日' : '見積番号・見積日・担当',
           <>
             <span data-field="quoteNo" className={`flex items-center gap-1 rounded px-1 text-xs font-bold text-slate-600 ${missing.has('quoteNo') ? 'bg-amber-50' : ''} ${active === 'quoteNo' ? 'bg-amber-50/60 outline outline-2 outline-amber-300' : ''}`}>
               見積番号
@@ -119,17 +119,19 @@ export function EstimateInputs({
               見積日
               <input type="date" value={sale.estimateDate} onChange={(e) => change({estimateDate: e.target.value})} className={dateInput} aria-label="見積日" />
             </span>
-            <span data-field="staff" className={`flex items-center gap-1 rounded px-1 text-xs font-bold text-slate-600 ${missing.has('staff') ? 'bg-amber-50' : ''} ${active === 'staff' ? 'bg-amber-50/60 outline outline-2 outline-amber-300' : ''}`}>
-              担当
-              <select value={sale.staff} onChange={(e) => change({staff: e.target.value})} className="h-9 w-36 min-w-0 rounded-md border border-slate-300 px-2 text-sm font-normal" aria-label="担当">
-                <option value="">—</option>
-                {[...new Set([...s.staffList, sale.staff].filter(Boolean))].map((x) => (
-                  <option key={x} value={x}>
-                    {x}
-                  </option>
-                ))}
-              </select>
-            </span>
+            {!isOitaSale(sale) && (
+              <span data-field="staff" className={`flex items-center gap-1 rounded px-1 text-xs font-bold text-slate-600 ${missing.has('staff') ? 'bg-amber-50' : ''} ${active === 'staff' ? 'bg-amber-50/60 outline outline-2 outline-amber-300' : ''}`}>
+                担当
+                <select value={sale.staff} onChange={(e) => change({staff: e.target.value})} className="h-9 w-36 min-w-0 rounded-md border border-slate-300 px-2 text-sm font-normal" aria-label="担当">
+                  <option value="">—</option>
+                  {[...new Set([...s.staffList, sale.staff].filter(Boolean))].map((x) => (
+                    <option key={x} value={x}>
+                      {x}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            )}
           </>,
         )}
         {row(

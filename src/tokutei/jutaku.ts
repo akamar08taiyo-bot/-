@@ -132,7 +132,7 @@ export function applyJutaku(sales: Sale[], settings: Settings, h: JutakuHandoff,
     const value = h.fields[key];
     const cur = linked[key];
     if (sameValue(cur, value)) continue;
-    if (sameValue(cur, '') || sameValue(cur, prev[key])) Object.assign(patch, {[key]: value});
+    if ((key === 'insurer' && value === 'oita') || sameValue(cur, '') || sameValue(cur, prev[key])) Object.assign(patch, {[key]: value});
   }
   // 保険者を入れ直したら、個別切り上げも保険者に合わせる（案件の画面で保険者を選び直したときと同じ）
   if (patch.insurer) patch.perItem = INSURERS.find((i) => i.key === patch.insurer)?.perItem ?? false;

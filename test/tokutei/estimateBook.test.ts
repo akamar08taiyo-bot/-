@@ -558,3 +558,12 @@ test('4商品：商品の間をあけずに、限度額を超えた分までの�
   assert.deepEqual(['A26', 'A27', 'A30'].map((r) => readCell(three, SH, r)), ['', '見本工業', '']);
 });
 
+
+test('大分市の販売見積書は他営業所の設定や担当名があっても大分営業所で発行する', () => {
+  const draft = sale({insurer: 'oita', staff: '行橋の担当者'});
+  const files = unzipSync(fillEstimate(template(), draft, {...S, company: '別名', manager: '行橋の所長'}));
+  assert.deepEqual(['I8', 'I9', 'I11', 'I12', 'I13', 'I14', 'I16'].map((r) => readCell(files, SH, r)), [
+    '太陽シルバーサービス株式会社', '大分営業所　所長　山下　厚', '〒870-0953', '大分県大分市下郡東1-4-35', 'TEL：097-504-8001', 'FAX：097-504-8002', '',
+  ]);
+  assert.ok(estimatePreview(template(), draft, S).length);
+});
