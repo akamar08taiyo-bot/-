@@ -502,11 +502,15 @@ function readOtherShinsei(sheets: Sheet[], file: string, hash: string): ReadDoc 
   return doc;
 }
 
+export function canImportOitaEstimate(officeName: string, insurer: Insurer | '' = ''): boolean {
+  return officeName.trim() === '大分営業所' || insurer === 'oita';
+}
+
 /**
  * Excel のファイルを読む（申請書・理由書・見積書のどれか）。読めなければ null（.xls・表でないファイル・どの書類でもない表）。
  * modified はファイルの更新時刻（見積書の作成日がないとき、書類の日付に使う）
  */
-export function readDoc(bytes: Uint8Array, file: string, s: EstimateSettings, modified = 0, officeName = ''): ReadDoc | null {
+export function readDoc(bytes: Uint8Array, file: string, s: EstimateSettings, modified = 0, officeName = '', insurer: Insurer | '' = ''): ReadDoc | null {
   if (!isXlsx(bytes)) return null;
   const hash = hashOf(bytes);
   const fileDate = modified > 0 ? isoDate(modified) : '';
@@ -547,7 +551,7 @@ export function readDoc(bytes: Uint8Array, file: string, s: EstimateSettings, mo
     sh.rows.some(oitaDetailHeader),
   );
   if (oitaSheet) {
-    if (officeName !== '大分営業所') return null;
+    if (!canImportOitaEstimate(officeName, insurer)) return null;
     const doc = readOitaEstimate(oitaSheet, file, hash, s);
     return doc && {...doc, date: doc.date || fileDate};
   }

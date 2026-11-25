@@ -25,7 +25,7 @@ import {rememberStaff} from '../lastStaff.ts';
 import {staffFull, thisMonth, todayIso, yen} from '../util.ts';
 import {duplicateEstimate} from './EstimateList.tsx';
 import {UriageDialog} from './UriageDialog.tsx';
-import {applyImport, compactName, readDoc} from '../importDocs.ts';
+import {applyImport, canImportOitaEstimate, compactName, readDoc} from '../importDocs.ts';
 import type {ReadDoc} from '../importDocs.ts';
 import type {JobDocs} from '../components/DocsDialog.tsx';
 
@@ -69,7 +69,7 @@ export function EstimateEditor({
   const [uriageOpen, setUriageOpen] = useState(false);
 
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? startEstimate(j, {...fn(j), updatedAt: Date.now()}) : j)));
-  const canImport = !DEMO && s.officeName.trim() === '大分営業所';
+  const canImport = !DEMO && canImportOitaEstimate(s.officeName, insurer);
   const importInput = useRef<HTMLInputElement>(null);
   const [readingEstimate, setReadingEstimate] = useState(false);
   const [estimateImport, setEstimateImport] = useState<ReadDoc | null>(null);
@@ -79,7 +79,7 @@ export function EstimateEditor({
   const readEstimateFile = async (file: File) => {
     setReadingEstimate(true);
     try {
-      const d = readDoc(new Uint8Array(await file.arrayBuffer()), file.name, s, file.lastModified, s.officeName.trim());
+      const d = readDoc(new Uint8Array(await file.arrayBuffer()), file.name, s, file.lastModified, s.officeName, insurer);
       if (!d?.sourceSheet || !d.rows) {
         toast('大分営業所の下請け見積書を読み取れませんでした。Excel形式と明細の合計を確認してください。', 'error');
       } else {

@@ -1230,7 +1230,7 @@ export function EstimateSheet({
           広い画面だけ（狭い画面は上の段と同じなので出さない）。見積書を下へ動かしてもついてくる（見えているページの表の横。上の sideRef） */}
       <div className={`relative shrink-0 lg:block lg:w-60 ${importButton ? '' : 'hidden'}`}>
       {importButton && (
-        <div className="flex justify-center px-2 py-4 lg:absolute lg:inset-x-0 lg:top-0 lg:z-10">
+        <div className="flex justify-center px-2 py-4 lg:absolute lg:inset-x-0 lg:top-20 lg:z-10">
           {importButton}
         </div>
       )}

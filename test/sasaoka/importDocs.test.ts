@@ -491,5 +491,8 @@ test('大分営業所の下請け見積は表紙と明細を照合し、別シ�
   const exported = unzipSync(estimateXlsx(job, S, '2026-11-23').bytes);
   assert.match(strFromU8(exported['xl/worksheets/sheet1.xml']), /<f>ROUND\([A-Z]+\d+\*[A-Z]+\d+,0\)<\/f><v>7820<\/v>/);
   assert.equal(readDoc(bytes, '見本.xlsx', S, 0, '行橋営業所'), null);
+  assert.equal(readDoc(bytes, '見本.xlsx', S, 0, '行橋営業所', 'oita')?.total, 9702);
+  assert.equal(readDoc(bytes, '見本.xlsx', S, 0, '', 'oita')?.total, 9702);
+  assert.equal(readDoc(bytes, '見本.xlsx', S, 0, '行橋営業所', 'yukuhashi'), null);
   assert.equal(readDoc(book(7819), '見本.xlsx', S, 0, '大分営業所'), null);
 });
