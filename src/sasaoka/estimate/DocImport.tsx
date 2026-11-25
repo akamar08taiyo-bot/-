@@ -76,7 +76,7 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
     const docs: ReadDoc[] = [];
     const unread: string[] = [];
     for (const f of files) {
-      const d = readDoc(new Uint8Array(await f.arrayBuffer()), f.name, s, f.lastModified);
+      const d = readDoc(new Uint8Array(await f.arrayBuffer()), f.name, s, f.lastModified, DEMO ? '' : s.officeName.trim());
       if (d) docs.push(d);
       else unread.push(f.name);
     }
@@ -343,6 +343,7 @@ export function useDocImport(data: AppData, update: Update, onImported: (month: 
                       <li key={d.hash} className="flex flex-wrap items-center gap-2">
                         <span className={`rounded border px-1.5 py-0.5 ${KIND_STYLE[d.kind]}`}>{DOC_LABEL[d.kind]}</span>
                         <span className="text-slate-800">{d.file}</span>
+                        {d.sourceSheet && <span className="text-slate-700">下請け見積書（シート：{d.sourceSheet}、工事 {d.places.length}か所）</span>}
                         {d.name && d.name !== g.name && <span className="text-slate-500">（{d.name}）</span>}
                         <span className="tabular-nums text-slate-700">{amountText(d)}</span>
                         {d.photos.length > 0 && <span className="text-slate-600">写真 {d.photos.length}枚</span>}

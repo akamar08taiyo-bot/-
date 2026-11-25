@@ -308,6 +308,7 @@ export type FormLine = {
   qty: number;
   unit: string;
   unitPrice: number;
+  roundAmount?: boolean;
   amount: number;
   excluded: boolean; // 介護保険の対象外
   listPrice: number; // 定価（備考・算出根拠の「定価8,000円×0.8」）。施工費は 0
@@ -355,6 +356,7 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
           qty: l.qty,
           unit: rowUnit(r),
           unitPrice: l.unitPrice,
+          roundAmount: r.estRound,
           amount: l.amount,
           listPrice: listPriceOf(r), // 定価が空欄なら 仕切価格×1.25
           // 掛け率：自動の単価は設定の率（0.8）、手で入れた単価は 単価÷定価（5,600円÷8,000円＝×0.7。割り切れなければ書かない）

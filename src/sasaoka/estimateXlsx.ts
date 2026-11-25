@@ -3,7 +3,7 @@
 // 金額の欄は、Excel で数量・単価を直しても計算し直されるよう、元の見積書と同じ式（ROUNDDOWN(数量×単価) など）にする。
 // 式ではアプリと同じ金額にならない行（割り切れない長さの部材など）は、アプリの金額をそのまま書く。
 
-import {estimateTotals, rounddown} from './calc.ts';
+import {estimateTotals, rounddown, roundYen} from './calc.ts';
 import {CARE_RED_XLSX, withCareLines} from './careLines.ts';
 import type {EstimateSums, EstimateTotals} from './calc.ts';
 import {circled, FORM_INFO, formLines, jobForm, KINDS, lineNote, paginate, reiwa, TOTAL_ROWS} from './estimateForms.ts';
@@ -74,9 +74,10 @@ const count = (q: number, w: number, h: number, maxPt = 9): XStyle => ({size: fi
 const qty3 = (n: number) => Math.round(n * 1000) / 1000;
 const pct = (rate: number) => Math.round(rate * 1000) / 10;
 
-/** 金額＝ROUNDDOWN(数量×単価) の式。式の答えがアプリの金額と違うとき（割り切れない長さを丸めた数量など）は使わない */
-function amountFormula(qty: number, price: number, amount: number, qtyCell: string, priceCell: string): string | undefined {
-  return rounddown(qty * price) === amount ? `ROUNDDOWN(${qtyCell}*${priceCell},0)` : undefined;
+/** 金額＝数量×単価を1円単位にする式。式の答えがアプリの金額と違うとき（割り切れない長さを丸めた数量など）は使わない */
+function amountFormula(qty: number, price: number, amount: number, qtyCell: string, priceCell: string, round = false): string | undefined {
+  const rounded = (round ? roundYen : rounddown)(qty * price);
+  return rounded === amount ? `${round ? 'ROUND' : 'ROUNDDOWN'}(${qtyCell}*${priceCell},0)` : undefined;
 }
 
 /**
@@ -230,7 +231,7 @@ function ykLine(l: FormLine, r: number, put: Put) {
   const unit = fit(l.unit, YK.E, YK_ROW, 11);
   put(4, unit.v, 'nl', unit.st);
   put(5, l.unitPrice, 'r', money(l.unitPrice, YK.F, YK_ROW));
-  put(6, open ? null : l.amount, 'r mr', money(l.amount, YK.G, YK_ROW), open ? undefined : amountFormula(q, l.unitPrice, l.amount, D, F));
+  put(6, open ? null : l.amount, 'r mr', money(l.amount, YK.G, YK_ROW), open ? undefined : amountFormula(q, l.unitPrice, l.amount, D, F, l.roundAmount));
   // 介護保険対象部分は左の数量・単価・金額と同じ（左を直せば、こちらも変わる）
   put(7, target && !open ? q : null, 'r nr', count(q, YK.H, YK_ROW), target && !open ? D : undefined);
   const unit2 = fit(l.unit, YK.I, YK_ROW, 11);
@@ -401,7 +402,7 @@ function kkLine(l: FormLine, r: number, height: number, bottom: string, hourRate
   const unit = fit(l.unit, KK.G, height, 11);
   put(6, unit.v, 'gothic', unit.st);
   put(7, l.unitPrice, 'r gothic', money(l.unitPrice, KK.H, height));
-  put(8, open ? null : l.amount, 'r mr gothic', money(l.amount, KK.I, height), open ? undefined : amountFormula(q, l.unitPrice, l.amount, F, H));
+  put(8, open ? null : l.amount, 'r mr gothic', money(l.amount, KK.I, height), open ? undefined : amountFormula(q, l.unitPrice, l.amount, F, H, l.roundAmount));
   put(9, null, 'gap');
   put(10, l.first ? ph.v : null, 'c ml', ph.st);
   put(11, l.first ? kd.v : null, 'c', kd.st);

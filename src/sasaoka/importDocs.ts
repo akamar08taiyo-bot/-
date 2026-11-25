@@ -8,7 +8,7 @@
 //           ほかの形（ほかの工務店の見積書など）と、合計が合わない見積書は、お客様名・住所と合計の金額だけを読む
 // 売上見込み・受注残の金額は salesPlan.ts の jutakuSales（見積書の行 → 取り込んだ見積書の合計 → 申請書の改修費用）。工務店の請求書には入れない（shikiri: false）
 
-import {estimateTotals, hasEstimateRows, isBlankRow, overheadAuto} from './calc.ts';
+import {estimateAmount, estimateTotals, hasEstimateRows, isBlankRow, overheadAuto} from './calc.ts';
 import {CARE_LINE} from './careLines.ts';
 import {plateFromText} from './cutLink.ts';
 import type {EstimateSettings} from './calc.ts';
@@ -32,6 +32,7 @@ export const DOC_LABEL: Record<DocKind, string> = {shinsei: '申請書', estimat
 /** 読んだ書類1つ */
 export type ReadDoc = {
   file: string;
+  sourceSheet?: string; // 大分営業所の下請け見積書で採用したシート
   hash: string;
   kind: DocKind;
   name: string; // お客様名（被保険者氏名。「様」「様邸」は除く）
@@ -405,6 +406,87 @@ function readEstimate(sheets: Sheet[], file: string, hash: string, s: EstimateSe
   return doc;
 }
 
+const oitaDetailHeader = (r: string[]) =>
+  compactName(cell(r, 0)) === '摘要' &&
+  compactName(cell(r, 10)) === '数量' &&
+  compactName(cell(r, 12)) === '単価' &&
+  compactName(cell(r, 14)).startsWith('金額');
+
+/** 大分営業所の下請け様式。表紙の合計と一致する同一シート内の明細ページを取り込む。 */
+function readOitaEstimate(sheet: Sheet, file: string, hash: string, s: EstimateSettings): ReadDoc | null {
+  const {rows} = sheet;
+  const labels = rows.map((r) => compactName(cell(r, 0)));
+  const field = (label: string) => rows[labels.indexOf(label)];
+  const total = money(cell(field('税込合計金額'), 5));
+  const subtotal = money(cell(rows.find((r) => compactName(cell(r, 11)) === '税抜き合計'), 14));
+  const work = cell(field('工事名'), 2);
+  const name = cleanName(/^(.+?)(?:様邸|邸|様)(?:\s|$)/.exec(work)?.[1] ?? '');
+  if (total === null || subtotal === null || !name) return null;
+
+  const places: Place[] = [];
+  let place: Place | undefined;
+  let inDetails = false;
+  let pageTotal = 0;
+  let pages = 0;
+  let overhead = 0;
+  for (const r of rows) {
+    const label = cell(r, 0);
+    const compact = compactName(label);
+    if (oitaDetailHeader(r)) {
+      if (inDetails) return null;
+      inDetails = true;
+      pageTotal = 0;
+      place = undefined;
+      continue;
+    }
+    if (!inDetails || !label) continue;
+    if (compact === '合計') {
+      if (money(cell(r, 14)) !== pageTotal) return null;
+      pages++;
+      inDetails = false;
+      continue;
+    }
+    const qty = numOf(cell(r, 10));
+    const price = numOf(cell(r, 12));
+    const amount = money(cell(r, 14));
+    const heading = /^([①-⑳])\s*([^\s]+)\s*(.*)$/.exec(label);
+    if (heading && !qty && !price && !amount) {
+      const photo = circledNo(heading[1]);
+      const detail = heading[3].replace(/(L\s*=\s*[\d+x×.]+)$/i, '$1mm');
+      place = {...placeFromShinsei({name: heading[2], kind: 1, photo, text: detail}), rows: []};
+      places.push(place);
+      continue;
+    }
+    if (qty === null || price === null || amount === null) return null;
+    pageTotal += amount;
+    if (compact === '諸経費') {
+      overhead += amount;
+      continue;
+    }
+    if (!place) return null;
+    const labor = isLaborText(label) || /^取付費/.test(label);
+    const row = manualRow(labor ? 'labor' : 'material', {
+      name: label,
+      qty,
+      unit: cell(r, 11).normalize('NFKC'),
+      estPrice: price,
+      estText: labor ? label : null,
+      estNote: cell(r, 19) || null,
+      estRound: true,
+    });
+    if (estimateAmount(row, s) !== amount) return null;
+    place.rows.push(row);
+  }
+  if (inDetails || pages === 0 || !places.some((p) => p.rows.length)) return null;
+  const trial = {places, overhead};
+  const calculated = estimateTotals(trial, s).all;
+  if (calculated.subtotal + overhead !== subtotal || calculated.total !== total) return null;
+  return {
+    ...base(file, hash, 'estimate'), sourceSheet: sheet.name, name, address: cell(field('工事場所'), 2),
+    date: dateOf(cell(rows[1], 13)), places, rows: true, overhead, total, tax: calculated.tax,
+  };
+}
+
 /** ほかの形の申請書（題名に「申請書」があり、改修費用の欄がある）：お客様名・住所・費用だけ */
 function readOtherShinsei(sheets: Sheet[], file: string, hash: string): ReadDoc | null {
   const rows = sheets.flatMap((sh) => sh.rows);
@@ -424,7 +506,7 @@ function readOtherShinsei(sheets: Sheet[], file: string, hash: string): ReadDoc 
  * Excel のファイルを読む（申請書・理由書・見積書のどれか）。読めなければ null（.xls・表でないファイル・どの書類でもない表）。
  * modified はファイルの更新時刻（見積書の作成日がないとき、書類の日付に使う）
  */
-export function readDoc(bytes: Uint8Array, file: string, s: EstimateSettings, modified = 0): ReadDoc | null {
+export function readDoc(bytes: Uint8Array, file: string, s: EstimateSettings, modified = 0, officeName = ''): ReadDoc | null {
   if (!isXlsx(bytes)) return null;
   const hash = hashOf(bytes);
   const fileDate = modified > 0 ? isoDate(modified) : '';
@@ -457,6 +539,17 @@ export function readDoc(bytes: Uint8Array, file: string, s: EstimateSettings, mo
     sheets = readXlsx(bytes);
   } catch {
     return null;
+  }
+  const oitaSheet = sheets.find((sh) =>
+    compactName(cell(sh.rows[0], 0)) === '見積書' &&
+    sh.rows.some((r) => compactName(cell(r, 0)) === '工事名') &&
+    sh.rows.some((r) => compactName(cell(r, 0)) === '税込合計金額') &&
+    sh.rows.some(oitaDetailHeader),
+  );
+  if (oitaSheet) {
+    if (officeName !== '大分営業所') return null;
+    const doc = readOitaEstimate(oitaSheet, file, hash, s);
+    return doc && {...doc, date: doc.date || fileDate};
   }
   const doc = readTokutei(sheets, file, hash) ?? readEstimate(sheets, file, hash, s) ?? readOtherShinsei(sheets, file, hash);
   if (doc && !doc.date) doc.date = fileDate;

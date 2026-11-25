@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
-import {zipSync, strToU8} from 'fflate';
+import {zipSync, strToU8, strFromU8, unzipSync} from 'fflate';
 import {estimateTotals} from '../../src/sasaoka/calc.ts';
 import {DEFAULT_LABOR, defaultSettings} from '../../src/sasaoka/defaults.ts';
 import {NO_SHINSEI} from '../../src/sasaoka/estimateForms.ts';
@@ -15,6 +15,8 @@ import {jutakuSales, jutakuSalesSummary, planRows} from '../../src/sasaoka/sales
 import {fillShinsei, SHINSEI, shinseiValues, shinseiWorks} from '../../src/sasaoka/shinsei.ts';
 import {cleanJobs} from '../../src/sasaoka/storage.ts';
 import type {Insurer, Job, Place} from '../../src/sasaoka/types.ts';
+
+import {writeXlsx} from '../../src/sasaoka/xlsxWrite.ts';
 
 const S = defaultSettings();
 const tmpl = (name: string) => new Uint8Array(readFileSync(new URL(`../../src/sasaoka/shinsei/${name}.xltx`, import.meta.url)));
@@ -454,4 +456,40 @@ test('特定福祉用具の申請書（北九州市・福岡市の様式の並�
   assert.deepEqual(f.tokutei, [{category: '歩行補助つえ', name: '多点杖 見本E', code: '', maker: '見本工業', amount: 11000, taxIn: true}]);
   // 住宅改修の申請書（委任状に「福祉用具購入費及び住宅改修費」とある）・ほかの表は特定福祉用具の申請書としない
   assert.notEqual(readDoc(gridBook([['委任状', [{0: '委任状'}, {0: '（介護保険福祉用具購入費及び住宅改修費に係る受領委任払い用）'}, {0: '被保険者氏名', 5: '見本 花子'}]]]), 'x.xlsx', S)?.kind, 'tokutei');
+});
+
+test('大分営業所の下請け見積は表紙と明細を照合し、別シートを加算せずに自社見積へ取り込む', () => {
+  const rows = (values: [number, string | number][][]) =>
+    values.map((row) => ({h: 5, cells: new Map(row.map(([c, v]) => [c, {v}]))}));
+  const sheet = {
+    cols: Array(20).fill(10), merges: [], breaks: [], landscape: false, font: {name: 'Calibri', size: 11},
+    margins: {l: 5, r: 5, t: 5, b: 5, header: 0, footer: 0},
+  };
+  const header: [number, string][] = [[0, '摘　要'], [10, '数　量'], [12, '単　価'], [14, '金額（税抜・税込）']];
+  const book = (firstPageTotal: number) => writeXlsx([
+    {...sheet, name: '見積書', rows: rows([
+      [[0, '見積書']], [[13, '2026/11/23']], [[0, '工事名'], [2, '見本 花子邸　住宅改修工事']],
+      [[0, '工事場所'], [2, '大分市中央町1-1']], [[11, '税抜き合計'], [14, 8820]], [[0, '税込合計金額'], [5, 9702]],
+      header, [[0, '①　玄関　木製横手すり　L=1950']],
+      [[0, '見本の手すり'], [10, 1.95], [11, 'ｍ'], [12, 4010], [14, 7820], [19, '備考']],
+      [[0, '合　計'], [14, firstPageTotal]],
+      header, [[0, '諸経費'], [10, 1], [11, '式'], [12, 1000], [14, 1000]], [[0, '合　計'], [14, 1000]],
+    ])},
+    {...sheet, name: '見積書 (3)', rows: rows([header, [[0, '合　計'], [14, 2000]]])},
+  ]);
+  const bytes = book(7820);
+  const d = readDoc(bytes, '見本.xlsx', S, 0, '大分営業所');
+  assert.ok(d);
+  assert.equal(d.sourceSheet, '見積書');
+  assert.equal(d.name, '見本 花子');
+  assert.equal(d.date, '2026-11-23');
+  assert.equal(d.places.length, 1);
+  assert.deepEqual(d.places[0].dims, {l: '1950'});
+  assert.equal(d.places[0].rows[0].estPrice, 4010);
+  const job = applyImport(null, [d], d.name, '2026-11', S);
+  assert.deepEqual(estimateTotals(cleanJobs([job])[0], S).all, {subtotal: 7820, overhead: 1000, tax: 882, total: 9702});
+  const exported = unzipSync(estimateXlsx(job, S, '2026-11-23').bytes);
+  assert.match(strFromU8(exported['xl/worksheets/sheet1.xml']), /<f>ROUND\([A-Z]+\d+\*[A-Z]+\d+,0\)<\/f><v>7820<\/v>/);
+  assert.equal(readDoc(bytes, '見本.xlsx', S, 0, '行橋営業所'), null);
+  assert.equal(readDoc(book(7819), '見本.xlsx', S, 0, '大分営業所'), null);
 });
