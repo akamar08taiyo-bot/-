@@ -7,7 +7,7 @@ import {EstimateSheet} from '../components/EstimateSheet.tsx';
 import {missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
 import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
-import {Btn, Modal, TextInput, useToast} from '../components/ui.tsx';
+import {Btn, DropArea, Modal, TextInput, useToast} from '../components/ui.tsx';
 import {FORM_INFO, formLabel, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_SHINSEI} from '../estimateForms.ts';
 import {CARE_RED, careLines, showsCareLines} from '../careLines.ts';
 import {BurdenPicker} from './ShinseiEditor.tsx';
@@ -91,6 +91,15 @@ export function EstimateEditor({
     } finally {
       setReadingEstimate(false);
     }
+  };
+
+  const selectEstimateFiles = (files: File[]) => {
+    if (!canImport || readingEstimate || estimateImport || !files.length) return;
+    if (files.length !== 1 || !/\.xlsx$/i.test(files[0].name)) {
+      toast('見積書のExcelファイル（.xlsx）を1つ選んでください。', 'error');
+      return;
+    }
+    void readEstimateFile(files[0]);
   };
 
   const importIntoEstimate = () => {
@@ -400,9 +409,9 @@ export function EstimateEditor({
           accept=".xlsx"
           hidden
           onChange={(e) => {
-            const file = e.currentTarget.files?.[0];
+            const files = Array.from(e.currentTarget.files ?? []);
             e.currentTarget.value = '';
-            if (file) void readEstimateFile(file);
+            selectEstimateFiles(files);
           }}
         />
       )}
@@ -445,9 +454,16 @@ export function EstimateEditor({
         onPrint={() => onPrint({kind: 'estimate', jobId: job.id})}
         excel={docs?.excel}
         importButton={canImport && (
-          <Btn color="softBlue" className="min-h-12 w-48 max-w-full !text-base" disabled={readingEstimate} onClick={() => importInput.current?.click()}>
-            {readingEstimate ? '読み込み中…' : '見積もりを取り込む'}
-          </Btn>
+          <DropArea
+            name="見積もりを取り込む"
+            label={readingEstimate ? '読み込み中…' : '見積もりを取り込む'}
+            hint={<>Excelをここにドロップ<br />押してファイルを選択（.xlsx）</>}
+            onFiles={selectEstimateFiles}
+            onPick={() => importInput.current?.click()}
+            disabled={readingEstimate}
+            big
+            className="min-h-12 w-48 max-w-full"
+          />
         )}
         between={settingsRow}
         focusRow={focusRow}
