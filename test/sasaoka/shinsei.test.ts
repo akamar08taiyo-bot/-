@@ -2474,3 +2474,24 @@ test('施工業者：工事見積書の右上の施工業者名も、選んだ�
   assert.equal(picked[0], `住　　　所　${o.address}`);
   assert.match(picked[2], new RegExp(`小倉南営業所所長　${o.manager}`));
 });
+
+test('大分市の工事見積書とExcelは営業所マスタの大分営業所で固定する', async () => {
+  const {issuerLines} = await import('../../src/sasaoka/print/formLayout.ts');
+  const {readXlsx} = await import('../../src/sasaoka/xlsx.ts');
+  const s = {...settingsForOffice(defaultSettings(), '行橋営業所'), person: '行橋の担当者'};
+  const j = job({
+    insurer: 'oita', staff: '久保 匠史', customer: '見本 花子', address: '大分市中央町1-1',
+    shinsei: {...NO_SHINSEI, builderOffice: '小倉南営業所'},
+  });
+  const lines = issuerLines(j, s);
+  assert.deepEqual(lines, [
+    '住　　　所　大分県大分市下郡東1-4-35',
+    '施工業者名　太陽シルバーサービス(株)大分営業所',
+    '代表者名　大分営業所所長　山下 厚',
+    '電話番号　097-504-8001',
+  ]);
+  const values = readXlsx(estimateXlsx(j, s, '2026-11-25').bytes).flatMap((sheet) => sheet.rows.flat());
+  assert.ok(values.includes(lines.join('\n')));
+  assert.ok(values.some((value) => value.includes(j.customer)));
+  assert.ok(values.some((value) => value.includes(j.address)));
+});
