@@ -659,7 +659,8 @@ test('大分市：支給申請書（第12号様式）と委任状。受領委任
   assert.equal(boxes('AK', 10, 4).map(at).join(''), '0001234567');
   assert.equal(at('I8'), '明･大･昭　　15年　3月　15日生');
   assert.equal(at('AD8'), '要支援(　　　）　･　要介護（　２　）');
-  assert.equal(at('A12'), '入浴補助用具\nシャワーチェア 見本A');
+  assert.equal(at('A12'), 'シャワーチェア');
+  assert.equal(at('A14'), '浴槽手すり');
   assert.deepEqual([at('N12'), at('Y12'), at('Y14')], ['見本工業', '28,160円', '27,808円']);
   assert.equal(at('Y16'), '円'); // 使わない行は原本のまま
   assert.equal(at('I20'), '太陽シルバーサービス㈱　大分営業所');

@@ -8,7 +8,7 @@
 import {insurerAreaName, insurerNoOf} from './insurerNumbers.ts';
 import {shinseiOfficeName} from './shinseiOffice.ts';
 import {saleTotals} from './calc.ts';
-import {CATEGORIES, docLabel} from './category.ts';
+import {CATEGORIES, docLabel, subShort} from './category.ts';
 import {CARE_LEVELS, isOitaSale, OFFICES, oitaIssuerSettings} from './defaults.ts';
 import type {CarePlan, Gender, PayMethod, Sale, Settings} from './types.ts';
 import {warekiLabel, warekiOf} from './wareki.ts';
@@ -47,6 +47,7 @@ export type ShinseiKey = 'yukuhashi' | 'kanda' | 'miyako' | 'kouiki' | 'fukuoka'
 /** 申請書の明細の1行 */
 export type ShinseiItem = {
   label: string; // 福祉用具名（種目及び商品名）：「入浴補助用具（入浴用いす）」と商品名の2行
+  itemLabel: string; // 品目の選択欄と同じ呼び方（細目がなければ種目）
   makerSeller: string; // 製造事業者名及び販売事業者名：メーカー名と会社名の2行
   total: number; // 購入金額（税込）
   amount: number; // 購入金額（税抜。北九州市の申請内容・概要書の金額）
@@ -149,6 +150,7 @@ export function shinseiValues(sale: Sale, settings: Settings): ShinseiValues {
     return {
       // 数量（「（2台）」）は書かない（ユーザーの指示「2台　などの文言は不要」2026-10-26。金額は数量分）
       label: [docLabel(i.category, i.sub), i.name.trim()].filter(Boolean).join('\n'),
+      itemLabel: subShort(i.sub.trim(), i.category.trim()),
       // メーカー名と会社名は1行ずつ。株式会社・（株）は㈱にして短く（ユーザーの指示「会社名や商品名は、1行から増えないようにする　太陽シルバーサービス㈱などでも良い」2026-10-26）
       makerSeller: [corpShort(i.maker), corpShort(s.company)].filter(Boolean).join('\n'),
       total: l.total,
@@ -986,7 +988,7 @@ function oitaSheets(v: ShinseiValues): SheetWrite[] {
         ...shown.flatMap((it, k): [string, CellValue][] => {
           const r = OITA_ROWS[k];
           return [
-            [`A${r}`, it.label],
+            [`A${r}`, it.itemLabel],
             [`N${r}`, it.maker],
             [`Y${r}`, `${it.total.toLocaleString('ja-JP')}円`],
           ];
