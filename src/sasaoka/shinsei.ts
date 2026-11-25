@@ -14,7 +14,7 @@ import {HOUSING_LIMIT} from './uriage.ts';
 import {BASE_PLATE} from './cutLink.ts';
 import {lengthParts, mmText} from './lengthText.ts';
 import {circled, eraOf, formLines, INSURER_INFO, jobInsurer, KINDS, lineNote, MARK_INFO, MARK_KEYS, NO_MARKS, NO_SHINSEI, photoNumbers, reiwa, shinseiKindNames} from './estimateForms.ts';
-import {ORIGINAL_OFFICE_TEXTS} from './company.ts';
+import {COMPANY_NAME, OFFICES, ORIGINAL_OFFICE_TEXTS} from './company.ts';
 import {insurerAreaName, insurerNoOf} from './insurerNumbers.ts';
 import {DEMO} from './demo/flag.ts';
 import {builderOffice, shinseiOfficeName, withBuilder, withPrime} from './shinseiOffice.ts';
@@ -1569,6 +1569,10 @@ function reiwaParts(iso: string): [string, string, string] {
 export function shinseiSettings<T extends BuilderSettings>(job: Job, s: T): T {
   // （株）イヤーズ デモアプリは下請けなので、施工業者は選んだ元請け（shinseiOffice.ts の withPrime。2026-11-12）
   if (DEMO) return withPrime(s, job.shinsei?.builderOffice ?? '');
+  if (jobInsurer(job) === 'oita') {
+    const office = OFFICES.find((o) => o.name === '大分営業所');
+    if (office) return {...s, company: COMPANY_NAME, officeName: office.name, builderKey: office.name, manager: office.manager, postal: office.postal, address: office.address, tel: office.tel};
+  }
   const current = (s.officeName ?? '').trim();
   // 申請書の画面で施工業者を選んでいれば、その営業所（ユーザーの指示「施工業者名は…行橋、小倉南、小倉、八幡東、八幡西にする。それぞれリストから選択、
   // 追加もできる」2026-11-11）。足した営業所は会社名も（入れていれば）

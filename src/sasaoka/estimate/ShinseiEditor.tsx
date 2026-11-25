@@ -452,6 +452,7 @@ export function ShinseiEditor({
       case 'works':
         return <WorksEditor job={job} setJob={setJob} s={s} insurer={i} materials={data.materials} />;
       case 'builder':
+        if (!DEMO && i === 'oita') return <span data-field="builder">大分営業所</span>;
         return DEMO ? <PrimePick info={info} setInfo={setInfo} s={s} update={update} /> : <BuilderPick job={job} info={info} setInfo={setInfo} s={s} update={update} />;
       case 'cost':
         return (
