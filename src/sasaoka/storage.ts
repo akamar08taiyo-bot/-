@@ -583,6 +583,13 @@ export function cleanSettings(raw: unknown): Settings {
   ] as const) {
     if (typeof raw[k] === 'string') s[k] = raw[k] as string;
   }
+  const account = raw.bankAccount;
+  if (isObj(account)) {
+    const {institution, branch, type, number, holder} = account;
+    if (typeof institution === 'string' && typeof branch === 'string' && typeof type === 'string' && typeof number === 'string' && typeof holder === 'string') {
+      s.bankAccount = {institution, branch, type, number, holder};
+    }
+  }
   // 所長名を入れる前に保存した設定は、保存してある営業所の所長名にする
   if (typeof raw.manager !== 'string') s.manager = OFFICES.find((o) => o.name === s.officeName)?.manager ?? '';
   s.rate = numv(raw.rate, d.rate);

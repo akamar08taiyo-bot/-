@@ -23,7 +23,7 @@ import {autoLength, costIsTotal, lengthsShown, estimatePlateLength, insuredBoxes
 import {riyuOf, shinseiBookValues} from '../riyu.ts';
 import {shinseiPreview} from '../shinseiPreview.ts';
 import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
-import type {AppData, BuilderOffice, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
+import type {AppData, BankAccount, BuilderOffice, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import {builderChoices, builderOffice, primeKey, primeName} from '../shinseiOffice.ts';
 import type {Update} from '../useStore.ts';
 import {defaultStaff} from '../lastStaff.ts';
@@ -598,6 +598,7 @@ export function ShinseiEditor({
       {!DEMO && (editingSetup || (setupNeeded && !setupDismissed)) && (
         <ApplicationSetup
           bank={s.bank}
+          bankAccount={s.bankAccount}
           staff={applicationStaff || job.staff || defaultStaff(s)}
           mobile={s.applicationMobile ?? ''}
           first={setupNeeded}
@@ -605,10 +606,11 @@ export function ShinseiEditor({
             setSetupDismissed(true);
             setEditingSetup(false);
           }}
-          onSave={(bank, staff, mobile) => {
+          onSave={(bank, bankAccount, staff, mobile) => {
             update('settings', (prev) => ({
               ...prev,
               bank,
+              bankAccount,
               applicationStaff: staff,
               applicationMobile: mobile,
               staffList: prev.staffList.includes(staff) ? prev.staffList : [...prev.staffList, staff],
@@ -960,21 +962,31 @@ function InsurerAreaPick({insurer, address, picked, onPick, selectRef}: {insurer
 
 const NO_BUILDER: BuilderOffice = {name: '', company: '', jigyoshoNo: '', postal: '', address: '', tel: '', manager: ''};
 
+const EMPTY_BANK: BankAccount = {institution: '', branch: '', type: '', number: '', holder: ''};
+const bankText = ({institution, branch, type, number, holder}: BankAccount) =>
+  [institution, branch, type, number, holder].map((v) => v.trim()).join(' ');
+
 function ApplicationSetup({
-  bank: initialBank, staff: initialStaff, mobile: initialMobile, first, onClose, onSave,
+  bank, bankAccount, staff: initialStaff, mobile: initialMobile, first, onClose, onSave,
 }: {
   bank: string;
+  bankAccount?: BankAccount;
   staff: string;
   mobile: string;
   first: boolean;
   onClose: () => void;
-  onSave: (bank: string, staff: string, mobile: string) => void;
+  onSave: (bank: string, account: BankAccount | undefined, staff: string, mobile: string) => void;
 }) {
-  const [bank, setBank] = useState(initialBank);
+  const savedAccount = bankAccount && bankText(bankAccount) === bank.trim() ? bankAccount : undefined;
+  const [account, setAccount] = useState(savedAccount ?? EMPTY_BANK);
+  const setBankField = (key: keyof BankAccount, value: string) => setAccount((prev) => ({...prev, [key]: value}));
+  const number = account.number.normalize('NFKC').trim();
+  const bankComplete = !!account.institution.trim() && !!account.branch.trim() && !!account.type && /^\d+$/.test(number) && !!account.holder.trim();
+  const keepLegacy = !!bank.trim() && !savedAccount && Object.values(account).every((value) => !value.trim());
   const [staff, setStaff] = useState(initialStaff);
   const [mobile, setMobile] = useState(initialMobile);
   const mobileDigits = mobile.normalize('NFKC').replace(/[\s-]/g, '');
-  const canSave = !!bank.trim() && !!staff.trim() && /^0[6-9]0\d{8}$/.test(mobileDigits);
+  const canSave = (bankComplete || keepLegacy) && !!staff.trim() && /^0[6-9]0\d{8}$/.test(mobileDigits);
 
   return (
     <form
@@ -982,16 +994,47 @@ function ApplicationSetup({
       className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3"
       onSubmit={(e) => {
         e.preventDefault();
-        if (canSave) onSave(bank.trim(), staff.trim(), telWithHyphens(mobileDigits));
+        if (!canSave) return;
+        const nextAccount = bankComplete ? {...account, number} : undefined;
+        onSave(nextAccount ? bankText(nextAccount) : bank.trim(), nextAccount, staff.trim(), telWithHyphens(mobileDigits));
       }}
     >
       <h2 className="font-bold text-emerald-900">{first ? '共通情報の初回登録' : '共通情報の変更'}</h2>
       <p className="text-sm text-slate-700">入力は初回のみです。担当者名と携帯番号は次回以降も引き継ぎます。お振込先は工務店請求書に反映します。</p>
+      <fieldset className="rounded-md border border-emerald-200 p-3">
+        <legend className="px-1 text-sm font-bold text-emerald-900">お振込先</legend>
+        {bank.trim() && !savedAccount && (
+          <p className="mb-2 break-words text-sm text-slate-700">登録済みのお振込先　{bank}。空欄のまま保存すると、この振込先を引き継ぎます。</p>
+        )}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="grid gap-1 text-sm font-bold text-slate-700">
+            金融機関名
+            <TextInput value={account.institution} onChange={(value) => setBankField('institution', value)} placeholder="例：○○銀行" />
+          </label>
+          <label className="grid gap-1 text-sm font-bold text-slate-700">
+            支店名
+            <TextInput value={account.branch} onChange={(value) => setBankField('branch', value)} placeholder="例：○○支店" />
+          </label>
+          <label className="grid gap-1 text-sm font-bold text-slate-700">
+            口座種別
+            <select aria-label="口座種別" value={account.type} onChange={(e) => setBankField('type', e.target.value)} className="h-9 rounded-md border border-slate-300 bg-white px-2">
+              <option value="">選択してください</option>
+              <option value="普通">普通</option>
+              <option value="当座">当座</option>
+              <option value="貯蓄">貯蓄</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm font-bold text-slate-700">
+            口座番号
+            <TextInput inputMode="numeric" value={account.number} onChange={(value) => setBankField('number', value)} placeholder="例：0123456" />
+          </label>
+          <label className="grid gap-1 text-sm font-bold text-slate-700 lg:col-span-2">
+            口座名義
+            <TextInput value={account.holder} onChange={(value) => setBankField('holder', value)} />
+          </label>
+        </div>
+      </fieldset>
       <div className="flex flex-wrap gap-3">
-        <label className="grid min-w-[13rem] flex-1 gap-1 text-sm font-bold text-slate-700">
-          金融機関・お振込先
-          <TextInput value={bank} onChange={setBank} required placeholder="銀行名・支店・口座種別・口座番号・口座名義" />
-        </label>
         <label className="grid gap-1 text-sm font-bold text-slate-700">
           担当者名
           <TextInput value={staff} onChange={setStaff} required />
