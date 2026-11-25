@@ -696,7 +696,8 @@ test('大分市：償還払いは■償還・長い理由は小さくして5行�
   const xml = strFromU8(f[sheetPath(f, OITA_SHEETS.shinsei)]);
   assert.ok(cellStyle(f, xml, 'I22').size < cellStyle(template('oita'), strFromU8(template('oita')[sheetPath(template('oita'), OITA_SHEETS.shinsei)]), 'I22').size);
   assert.deepEqual(shinseiChecks(otSale({gender: '', zip: ''}), OT_S).missing, []);
-  assert.deepEqual(shinseiChecks(otSale({careLevel: '', careOffice: '', careManager: ''}), {...OT_S, providerNo: ''}).missing, ['要介護度', '居宅介護支援事業所・ケアマネジャー（理由の記載者）', '販売事業者の事業者番号（10けた）']);
+  assert.deepEqual(shinseiChecks(otSale({careLevel: '', careOffice: '', careManager: ''}), {...OT_S, providerNo: ''}).missing, ['要介護度', '居宅介護支援事業所・ケアマネジャー（理由の記載者）']);
+  assert.equal(shinseiValues(otSale(), {...OT_S, providerNo: ''}).seller.providerNo, '4470105265');
 });
 
 test('アプリに入れた原本は空（前の方の記入・写真・丸が残っていない）', () => {
