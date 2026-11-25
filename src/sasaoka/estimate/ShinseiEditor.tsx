@@ -26,6 +26,7 @@ import type {PvPage, ShinseiField as Field} from '../shinseiPreview.ts';
 import type {AppData, BuilderOffice, Insurer, Job, Material, PhotoEdit, Place, PlaceDims, Settings, ShinseiInfo, ShinseiMarks} from '../types.ts';
 import {builderChoices, builderOffice, primeKey, primeName} from '../shinseiOffice.ts';
 import type {Update} from '../useStore.ts';
+import {defaultStaff} from '../lastStaff.ts';
 import {yen} from '../util.ts';
 import {addressOfZip, zipCandidates, zipLabel} from '../zip.ts';
 import {PhotoBoard, PhotoOrderDialog, photoPlaces, SLOT_LABEL, usePhotoActions, usePlanActions} from './PhotoBoard.tsx';
@@ -147,6 +148,16 @@ export function ShinseiEditor({
   const insurer = jobInsurer(job);
   const info: ShinseiInfo = {...NO_SHINSEI, ...job.shinsei};
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? {...fn(j), updatedAt: Date.now()} : j)));
+  const setupNeeded = !s.bank.trim() || !s.applicationStaff?.trim();
+  const [editingSetup, setEditingSetup] = useState(false);
+  const [setupDismissed, setSetupDismissed] = useState(false);
+  const applicationStaff = s.applicationStaff?.trim();
+  useEffect(() => {
+    if (DEMO || !applicationStaff || job.staff.trim()) return;
+    update('jobs', (jobs) => jobs.map((j) =>
+      j.id === job.id && !j.staff.trim() ? {...j, staff: applicationStaff, updatedAt: Date.now()} : j,
+    ));
+  }, [applicationStaff, job.id, job.staff, update]);
   const setInfo = (patch: Partial<ShinseiInfo>) => setJob((j) => ({...j, shinsei: {...NO_SHINSEI, ...j.shinsei, ...patch}}));
   const setInsurer = (i: Insurer) => setJob((j) => ({...j, insurer: i, form: INSURER_INFO[i].form}));
   // 保険者を選んだら、続けて区・市町村（保険者番号）を選ぶ所へ（ユーザーの指示「保険者を選んだ後に、〇〇区を選んで、保険者番号を確定させる」2026-10-29）
@@ -549,7 +560,12 @@ export function ShinseiEditor({
           </>
         }
         remove={(className) => <RemoveJobButton job={job} settings={s} update={update} onBack={onBack} className={className} />}
-        secondary={docs?.mail}
+        secondary={
+          <>
+            {docs?.mail}
+            {!DEMO && <Btn color="white" onClick={() => setEditingSetup(true)}>{setupNeeded ? '共通情報を初回登録' : '共通情報を変更'}</Btn>}
+          </>
+        }
         // 保険者・保険者番号は上の段の空いた所（ユーザーの指示「この部分も空いた部分に記載して、その分上にずらす」2026-11-03。前は上の段の下の1段）
         fields={
           <>
@@ -579,6 +595,29 @@ export function ShinseiEditor({
           </>
         }
       />
+      {!DEMO && (editingSetup || (setupNeeded && !setupDismissed)) && (
+        <ApplicationSetup
+          bank={s.bank}
+          staff={applicationStaff || job.staff || defaultStaff(s)}
+          first={setupNeeded}
+          onClose={() => {
+            setSetupDismissed(true);
+            setEditingSetup(false);
+          }}
+          onSave={(bank, staff) => {
+            update('settings', (prev) => ({
+              ...prev,
+              bank,
+              applicationStaff: staff,
+              staffList: prev.staffList.includes(staff) ? prev.staffList : [...prev.staffList, staff],
+            }));
+            if (setupNeeded) setJob((j) => ({...j, staff}));
+            setEditingSetup(false);
+            toast('共通情報を保存しました');
+          }}
+        />
+      )}
+
       {printing && pages && map && (
         <ShinseiPrint pages={pages} title={shinseiFileName(map, job, estimateDateOf(job)).replace(/\.xlsx$/, '')} photos={previewPhotos} plan={previewPlan} onClose={() => setPrinting(false)} />
       )}
@@ -918,6 +957,46 @@ function InsurerAreaPick({insurer, address, picked, onPick, selectRef}: {insurer
 }
 
 const NO_BUILDER: BuilderOffice = {name: '', company: '', jigyoshoNo: '', postal: '', address: '', tel: '', manager: ''};
+
+function ApplicationSetup({
+  bank: initialBank, staff: initialStaff, first, onClose, onSave,
+}: {
+  bank: string;
+  staff: string;
+  first: boolean;
+  onClose: () => void;
+  onSave: (bank: string, staff: string) => void;
+}) {
+  const [bank, setBank] = useState(initialBank);
+  const [staff, setStaff] = useState(initialStaff);
+  return (
+    <form
+      aria-label={first ? '共通情報の初回登録' : '共通情報の変更'}
+      className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (bank.trim() && staff.trim()) onSave(bank.trim(), staff.trim());
+      }}
+    >
+      <h2 className="font-bold text-emerald-900">{first ? '共通情報の初回登録' : '共通情報の変更'}</h2>
+      <p className="text-sm text-slate-700">入力は初回のみです。登録した担当者名は次回の申請書に、お振込先は工務店請求書に反映します。</p>
+      <div className="flex flex-wrap gap-3">
+        <label className="grid min-w-[13rem] flex-1 gap-1 text-sm font-bold text-slate-700">
+          金融機関・お振込先
+          <TextInput value={bank} onChange={setBank} required placeholder="銀行名・支店・口座種別・口座番号・口座名義" />
+        </label>
+        <label className="grid gap-1 text-sm font-bold text-slate-700">
+          担当者名
+          <TextInput value={staff} onChange={setStaff} required />
+        </label>
+      </div>
+      <div className="flex gap-2">
+        <Btn type="submit" color="emerald" disabled={!bank.trim() || !staff.trim()}>保存する</Btn>
+        <Btn color="white" onClick={onClose}>{first ? 'あとで登録' : '閉じる'}</Btn>
+      </div>
+    </form>
+  );
+}
 
 /**
  * 施工業者：申請書の施工者・受任者・事業者の欄に書く営業所（会社名・営業所・所在地・電話・所長）と事業者番号（介護保険の事業所番号）。

@@ -441,7 +441,7 @@ export default function App({start}: {start: MainTab}) {
   // 新規作成：保険者を選ぶと、申請書と見積書のタブのある様邸の画面を開く（左の申請書のタブから）。
   // 見積書に行を入れるまでは、見積もり作成日は空・笹岡工務店の請求書には入れない（申請書だけの様邸を請求書に入れないため。calc.ts の startEstimate）
   const newOne = (insurer: Insurer) => {
-    const j = newEstimate(insurer, defaultStaff(data.settings));
+    const j = newEstimate(insurer, data.settings.applicationStaff || defaultStaff(data.settings));
     store.update('jobs', (jobs) => [...jobs, j]);
     setEstimateId(j.id);
     setJobView('shinsei');
