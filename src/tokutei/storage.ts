@@ -4,7 +4,7 @@
 // 住宅改修 見積書アプリの src/sasaoka/storage.ts を手本にした。保存するたびにその項目の「印」（stamp:項目名）を変え、
 // 前に読んだときと印が違えば、別のタブが保存したということなので、読み直す・まとめてから保存する（sync.ts）。
 
-import {CARE_LEVELS, DEFAULT_STAFF, DEFAULT_SUPPLIERS, defaultSettings, OFFICES, SETTINGS_REV} from './defaults.ts';
+import {CARE_LEVELS, DEFAULT_STAFF, DEFAULT_SUPPLIERS, defaultSettings, OFFICES, SETTINGS_REV, portalOffice, settingsForOffice} from './defaults.ts';
 import {taxOf} from './calc.ts';
 import {cleanJutakuFields} from './jutaku.ts';
 import type {AppData, BurdenRatio, CarePlan, Gender, PayMethod, Product, Sale, SaleItem, SaleStatus, Settings, TaxType} from './types.ts';
@@ -390,11 +390,16 @@ export async function loadAllStamped(timeoutMs = LOAD_TIMEOUT_MS): Promise<{data
     /* localStorage を見る */
   }
   for (const k of DATA_KEYS) if (raw[k] === undefined) raw[k] = lsGet(k);
+  const settings = cleanKey('settings', raw.settings);
+  const office = OFFICES.find((entry) => entry.name === portalOffice());
+  const activeSettings = office ? settingsForOffice(settings, office.name) : settings;
+  if (office) activeSettings.providerNo = settings.providerNos?.[office.name] ??
+    (settings.officeName === office.name ? settings.providerNo || activeSettings.providerNo : activeSettings.providerNo);
   return {
     data: {
       products: cleanKey('products', raw.products),
       sales: cleanKey('sales', raw.sales),
-      settings: cleanKey('settings', raw.settings),
+      settings: activeSettings,
     },
     stamps,
   };
