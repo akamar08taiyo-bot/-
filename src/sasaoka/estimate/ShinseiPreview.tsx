@@ -127,6 +127,9 @@ function fitScale(t: PvText): number {
       widths[widths.length - 1] += textWidth(part, r.font) * FIT_MARGIN;
     });
   }
+  if (t.explicitLines) {
+    return Math.min(1, avail / Math.max(1, ...widths), t.h / (widths.length * size * 1.2));
+  }
   for (let k = 1; k > 0.3; k -= 0.05) {
     const rows = widths.reduce((n, w) => n + Math.max(1, Math.ceil((w * k) / Math.max(1, avail - size * k))), 0);
     if (rows * size * k * 1.2 <= t.h) return k;
@@ -182,7 +185,7 @@ function TextView({t}: {t: PvText}) {
         style={{
           textAlign: distributed ? 'justify' : (t.align as 'left' | 'center' | 'right'),
           textAlignLast: distributed ? 'justify' : undefined,
-          whiteSpace: t.wrap ? (distributed ? 'normal' : 'pre-wrap') : 'pre',
+          whiteSpace: t.wrap && !t.explicitLines ? (distributed ? 'normal' : 'pre-wrap') : 'pre',
           wordBreak: 'break-all',
           lineHeight: 1.2,
           // 行の高さは、この箱の文字の大きさ（ないと画面の 16px）の 1.2 倍より低くならないので、欄の文字の大きさにそろえる

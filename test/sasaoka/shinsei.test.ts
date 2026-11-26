@@ -2241,8 +2241,15 @@ test('大分市：手すりの箇所が5つでも、改修箇所及び規模の�
   const {fonts, xfs} = styleParts(files);
   const xf = xfs[Number(/\ss="(\d+)"/.exec(cell(a, 'O17'))?.[1] ?? 0)];
   assert.match(xf, /horizontal="left"/);
+  assert.match(xf, /vertical="top"/);
+  assert.deepEqual(lines.flatMap((line) => line.match(/L=\d+mm/g) ?? []),
+    ['L=600mm', 'L=2000mm', 'L=800mm', 'L=900mm', 'L=1200mm']);
   const preview = shinseiPreview(unzipSync(OITA), SHINSEI.oita!, shinseiBookValues(otJob({places}), OT_S));
-  assert.equal(preview.find((p) => p.sheet === '支給申請兼施工承認申請書')?.texts.find((t) => t.ref === 'O17')?.align, 'left');
+  const previewCell = preview.find((p) => p.sheet === '支給申請兼施工承認申請書')?.texts.find((t) => t.ref === 'O17');
+  assert.equal(previewCell?.align, 'left');
+  assert.equal(previewCell?.valign, 'top');
+  assert.equal(previewCell?.explicitLines, true);
+  assert.equal(previewCell?.runs.map((run) => run.text).join(''), text);
   assert.match(xf, /wrapText="1"/); // 行を分けて見せる（前は折り返さない＋縮小で、1行にとても小さく、または欄の外へ）
   assert.doesNotMatch(xf, /shrinkToFit="1"/);
   const size = Number(/<sz val="([\d.]+)"/.exec(fonts[Number(/fontId="(\d+)"/.exec(xf)?.[1] ?? 0)])?.[1]);

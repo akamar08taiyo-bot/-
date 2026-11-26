@@ -42,7 +42,7 @@ export type ShinseiSheet = {
   // 改修の種類（①手すりの取り付け〜⑤便器の取替）ごとに1つの欄（福岡市の「改修の内容」の5行）：その種類の改修の内容の行。⑥付帯工事の行は最初に書いた種類の欄に足す。
   // 何か書いたら、書かない種類の欄は「－」（福岡市の記載例と同じ）
   kindCells?: string[];
-  kindCellsAlign?: 'left';
+  kindCellsTopLeft?: boolean;
   insurerNo?: string[]; // 保険者番号の6マス（福岡市・広域連合。選んだ番号・保険証から読んだ番号、なければ住所から。insurerNumbers.ts）
   // 事業所番号の10マス（広域連合の承認申請書・支給申請書、行橋市の受領委任払の申請書）。申請書の営業所の介護保険の事業所番号（defaults.ts の OFFICES）。
   // 原本は行橋営業所の番号のままだった（ユーザーの指示「田川営業所の事業所番号に変えてください」2026-11-05）。一覧にない営業所なら空（ほかの営業所の番号を書かない）
@@ -1048,7 +1048,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
         insuredNo: boxes('AP', 10, 3),
         marks: [ERA('L7')],
         kindCells: OITA_KIND_ROWS.map((r) => `O${r}`),
-        kindCellsAlign: 'left',
+        kindCellsTopLeft: true,
         kindRows: OITA_KIND_ROWS.map((r) => ({texts: [T(`Z${r}`, '{builderShort}'), T(`AJ${r}`, ' R{startY}・{startM}・{startD}'), T(`AQ${r}`, ' R{endY}・{endM}・{endD}')]})),
         texts: [
           T('L3', '{kana}'),
@@ -2743,21 +2743,23 @@ function packKindCells(files: Files, sheet: ShinseiSheet, v: ShinseiValues): voi
   const lay = sheetLayout(xml);
   for (const [ref, text] of kindCellTexts(sheet.kindCells, v)) {
     if (!text || text === '－') continue;
-    const entries = text.split('\n');
+    const entries = text.split('\n').map((entry) => sheet.kindCellsTopLeft ? entry.trimStart() : entry);
     const box = rangeBox(lay, ref);
     const base = cellStyle(files, xml, ref).size;
-    for (let pt = base; pt >= 4.5; pt -= 0.5) {
+    const minPt = sheet.kindCellsTopLeft ? 1 : 4.5;
+    const availableWidth = box.w - (sheet.kindCellsTopLeft ? 12 : 6);
+    for (let pt = base; ; pt = Math.max(minPt, pt - 0.5)) {
       const px = (pt * 4) / 3;
       const lines: string[] = [];
       for (const e of entries) {
         // そのほかの行（下げた行）を前の行のうしろに並べるときは、下げたすき間を外す
         const last = lines.length ? `${lines[lines.length - 1]}　${e.replace(/^[ 　]+/, '')}` : '';
-        if (last && emOf(last) * px <= box.w - 6) lines[lines.length - 1] = last;
+        if (last && emOf(last) * px <= availableWidth) lines[lines.length - 1] = last;
         else lines.push(e);
       }
-      if (pt <= 4.5 || (lines.every((l) => emOf(l) * px <= box.w - 6) && lines.length * px * LINE_K <= box.h - 4)) {
+      if (pt <= minPt || (lines.every((l) => emOf(l) * px <= availableWidth) && lines.length * px * LINE_K <= box.h - 4)) {
         cells.set(ref, lines.join('\n'));
-        if (pt < base || lines.length > 1 || sheet.kindCellsAlign) sizes.push([ref, pt, lines.length > 1]);
+        if (pt < base || lines.length > 1 || sheet.kindCellsTopLeft) sizes.push([ref, pt, lines.length > 1]);
         break;
       }
     }
@@ -2771,10 +2773,10 @@ function packKindCells(files: Files, sheet: ShinseiSheet, v: ShinseiValues): voi
     // 2行以上なら折り返しの書式にする（大分市の改修箇所及び規模の欄は原本が折り返さない1行の欄で、改行が出ずに1行に並び、
     // 「縮小して全体を表示」でとても小さくなった。ユーザーの指摘「申請書からはみ出ています」2026-11-05。手すりの箇所が5つ）
     let style = numOf(attrOf(found[1], 's'), 0);
-    if (multi || sheet.kindCellsAlign) {
+    if (multi || sheet.kindCellsTopLeft) {
       style = alignedStyle(files, style, {
         ...(multi ? {wrapText: '1', shrinkToFit: null} : {}),
-        ...(sheet.kindCellsAlign ? {horizontal: sheet.kindCellsAlign} : {}),
+        ...(sheet.kindCellsTopLeft ? {horizontal: 'left', vertical: 'top', indent: null} : {}),
       });
     }
     if (pt < cellStyle(files, out, ref).size) style = sizedStyle(files, style, pt);

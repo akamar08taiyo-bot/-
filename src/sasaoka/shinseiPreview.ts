@@ -44,6 +44,7 @@ export type PvText = Rect & {
   align: 'left' | 'center' | 'right' | 'distributed';
   valign: 'top' | 'center' | 'bottom';
   wrap: boolean;
+  explicitLines?: boolean; // 帳票の作成時に決めた改行だけを使う
   shrink: boolean; // 縮小して全体を表示する
   vertical: boolean; // 縦書き（原本の文字の方向が「縦書き」。写真貼付用紙の改修の種別①〜⑥・理由書の「利用者」など）
   indent: number; // 画素
@@ -863,7 +864,9 @@ function buildPage(
     const valign: PvText['valign'] = xf.valign === 'top' ? 'top' : xf.valign === 'bottom' ? 'bottom' : 'center';
     // 折り返さない欄の改行は、Excel と同じく1行につなげて出す
     const shown = wrap ? runs : runs.map((run) => ({...run, text: run.text.replace(/\r?\n/g, '')}));
-    texts.push({...rect, ref: `${colName(c)}${r}`, runs: shown, align, valign, wrap, shrink: xf.shrink && !wrap, vertical: xf.vertical, indent: xf.indent * xf.font.size});
+    const ref = `${colName(c)}${r}`;
+    const explicitLines = sheet.kindCellsTopLeft && sheet.kindCells?.includes(ref);
+    texts.push({...rect, ref, runs: shown, align, valign, wrap, explicitLines, shrink: xf.shrink && !wrap, vertical: xf.vertical, indent: xf.indent * xf.font.size});
   }
 
   // 丸で囲む欄は、丸と同じ計算の文字の位置で描く
