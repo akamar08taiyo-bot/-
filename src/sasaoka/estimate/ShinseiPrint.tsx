@@ -1,5 +1,5 @@
 // 住宅改修申請書の印刷（ユーザーの指示「申請書を保存、まとめて保存、印刷ボタンを並びで表示する」2026-10-26）。
-// 申請書のタブのプレビューと同じページ（Excel に保存するときと同じ書き込みをしたシート）を、1ページずつ A4 縦の紙の余白の内側に入る大きさで描く。
+// 申請書のタブのプレビューと同じページ（Excel に保存するときと同じ書き込みをしたシート）を、1ページずつ A4 の紙の余白の内側に入る大きさで描く。
 // ブラウザの印刷で、そのまま紙・PDF にできる。初めは1枚目（事前申請書）だけ印刷し、ほかのページはチェックで足す
 // （特定福祉用具の申請書の印刷と同じ。ユーザーの指示「申請書印刷の場合は、１枚目のみ印刷、デフォルトは」2026-10-26）。
 // チェックの名前は「1枚目」ではなく書類の名前（申請書・委任状・平面図・写真①…）。チェックを入れるとそのページへ飛ぶ（2026-11-04）
@@ -13,10 +13,6 @@ import {paper, ShinseiPages} from './ShinseiPreview.tsx';
 import type {PreviewPhotos, PreviewPlan} from './ShinseiPreview.tsx';
 
 const MM = 96 / 25.4;
-/** 紙の余白（sasaoka.css の @page：上 11mm・左右 11mm・下 12mm）の内側。印刷の1枚の高さ（sasaoka.css の .shinsei-sheet の 270mm）に収まるように少し小さめ */
-const INNER = {w: (210 - 22 - 2) * MM, h: (297 - 23 - 6) * MM};
-const A4_PX = 210 * MM;
-
 const NO_MARKS = {} as ShinseiMarks;
 
 /**
@@ -31,6 +27,7 @@ export function ShinseiPrint({
   onClose,
   book = '申請書',
   all = false,
+  landscape = false,
 }: {
   pages: PvPage[];
   title: string;
@@ -39,8 +36,13 @@ export function ShinseiPrint({
   onClose: () => void;
   book?: string;
   all?: boolean;
+  landscape?: boolean;
 }) {
-  const fit = () => Math.min(1, Math.max(0.3, (window.innerWidth - 16) / A4_PX));
+  // 上下23mm・左右22mmの印刷余白より少し内側に帳票を収める。
+  const pageWidth = (landscape ? 297 : 210) * MM;
+  const innerWidth = pageWidth - 24 * MM;
+  const innerHeight = ((landscape ? 210 : 297) - 29) * MM;
+  const fit = () => Math.min(1, Math.max(0.3, (window.innerWidth - 16) / pageWidth));
   const [zoom, setZoom] = useState(fit);
   const [picked, setPicked] = useState<Set<number>>(() => new Set(all ? pages.map((_, i) => i) : [0]));
   useEffect(() => {
@@ -61,7 +63,7 @@ export function ShinseiPrint({
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('resize', onResize);
     };
-  }, [title, onClose]);
+  }, [title, onClose, pageWidth]);
   const last = Math.max(-1, ...picked);
   // ページの名前（申請書・委任状・平面図・写真① など。shinseiPreview.ts の printLabels）
   const labels = useMemo(() => printLabels(pages), [pages]);
@@ -89,9 +91,10 @@ export function ShinseiPrint({
   // 様邸の画面（印刷しない main の中）から開くので、body の直下に出す（main ごと印刷から外れないように）
   return createPortal(
     <div ref={overlayRef} className="print-overlay">
+      {landscape && <style>{'@media print { @page { size: A4 landscape; } }'}</style>}
       {/* 上の帯の中身はまん中に寄せる（ユーザーの指示「赤枠の部分を中央にもってくる」2026-10-28。前は 申請書（A4縦）・ページのチェックが左の端、印刷する・閉じるが右の端） */}
       <div ref={barRef} className="print-toolbar justify-center">
-        <div className="text-sm font-bold">{book}（A4縦）</div>
+        <div className="text-sm font-bold">{book}（A4{landscape ? '横' : '縦'}）</div>
         {pages.length > 1 && (
           <span role="group" aria-label="印刷するページ" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             {pages.map((p, i) => (
@@ -114,14 +117,14 @@ export function ShinseiPrint({
       <div className="print-root" style={zoom < 1 ? {zoom} : undefined}>
         {pages.map((p, i) => {
           const pp = paper(p);
-          const scale = Math.min(INNER.w / pp.width, INNER.h / pp.height);
+          const scale = Math.min(innerWidth / pp.width, innerHeight / pp.height);
           return (
             <div
               key={p.sheet}
               ref={(el) => {
                 sheetRefs.current[i] = el;
               }}
-              className={`shinsei-sheet ${picked.has(i) ? '' : 'shinsei-skip'} ${i === last ? 'shinsei-last' : ''}`}
+              className={`shinsei-sheet ${landscape ? 'shinsei-landscape' : ''} ${picked.has(i) ? '' : 'shinsei-skip'} ${i === last ? 'shinsei-last' : ''}`}
               aria-label={`${book}の印刷（${labels[i]}）`}
             >
               <ShinseiPages pages={[p]} missing={{}} active={null} marks={NO_MARKS} label={() => ''} onOpen={() => undefined} onToggle={() => undefined} photos={photos} plan={plan} title={book} print fixedScale={scale} />

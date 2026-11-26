@@ -437,7 +437,7 @@ export function RiyuEditor({
         remove={(className) => <RemoveJobButton job={job} settings={data.settings} update={update} onBack={onBack} className={className} />}
         secondary={docs?.mail}
       />
-      {printing && pages && <ShinseiPrint pages={pages} title={riyuFileName(job).replace(/\.xlsx$/, '')} book="理由書" all onClose={closePrint} />}
+      {printing && pages && <ShinseiPrint pages={pages} title={riyuFileName(job).replace(/\.xlsx$/, '')} book="理由書" all landscape onClose={closePrint} />}
 
 
       {/* 入れる所は申請書のタブより広く（文を書く欄が多い。ユーザーの指示「入力欄がやや狭い」2026-10-26） */}

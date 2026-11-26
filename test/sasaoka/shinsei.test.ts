@@ -2218,6 +2218,10 @@ test('大分市：支給申請兼施工承認申請書に書く（改修の内�
   assert.equal(at('M64'), '担当者氏名（　見本 三郎　）　　連絡先（　097-504-8001　）');
   // 足した丸は元号（昭）だけ（原本の印の丸3つはそのまま）
   assert.equal(ellipses(out, '支給申請兼施工承認申請書').length - ellipses(OITA, '支給申請兼施工承認申請書').length, 1);
+  const circles = ellipses(out, '支給申請兼施工承認申請書');
+  assert.ok(circles.some(({from}) => from[0] === 29 && from[2] === 38));
+  assert.ok(circles.every(({from}) => from[0] < 51)); // 用紙右外の原本の丸は削除済み
+
   // 連絡先を入れていなければ「（　－　－　）」のすき間のまま
   const noTel = sheets(fillShinsei(OITA, SHINSEI.oita!, shinseiBookValues(otJob({riyu: {...NO_RIYU}}), OT_S))).byName.get('支給申請兼施工承認申請書')!;
   assert.equal(txt(noTel, 'M61'), '担当者氏名（　見本 花子　）　　連絡先（　　　　　－　　　　－　　　　　）');
@@ -2236,6 +2240,9 @@ test('大分市：手すりの箇所が5つでも、改修箇所及び規模の�
   assert.ok(lines.length >= 2, text);
   const {fonts, xfs} = styleParts(files);
   const xf = xfs[Number(/\ss="(\d+)"/.exec(cell(a, 'O17'))?.[1] ?? 0)];
+  assert.match(xf, /horizontal="left"/);
+  const preview = shinseiPreview(unzipSync(OITA), SHINSEI.oita!, shinseiBookValues(otJob({places}), OT_S));
+  assert.equal(preview.find((p) => p.sheet === '支給申請兼施工承認申請書')?.texts.find((t) => t.ref === 'O17')?.align, 'left');
   assert.match(xf, /wrapText="1"/); // 行を分けて見せる（前は折り返さない＋縮小で、1行にとても小さく、または欄の外へ）
   assert.doesNotMatch(xf, /shrinkToFit="1"/);
   const size = Number(/<sz val="([\d.]+)"/.exec(fonts[Number(/fontId="(\d+)"/.exec(xf)?.[1] ?? 0)])?.[1]);
