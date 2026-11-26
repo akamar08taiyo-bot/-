@@ -11,7 +11,7 @@ import {Fragment, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef,
 import type {KeyboardEvent, ReactNode, RefObject} from 'react';
 import {isBlankRow, jobName} from '../calc.ts';
 import {Btn, KanaInput, TextInput, useToast} from '../components/ui.tsx';
-import {circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, offEstimate, photoNumbers} from '../estimateForms.ts';
+import {canImportOitaEstimate, circled, eraOf, INSURER_IDS, INSURER_INFO, insurerForAddress, jobInsurer, KINDS, MARK_INFO, NO_SHINSEI, offEstimate, photoNumbers} from '../estimateForms.ts';
 import {placeFromDims, plateFromText, withBrackets} from '../cutLink.ts';
 import {newPlace} from '../rows.ts';
 import {withSlots} from '../railSlots.ts';
@@ -1337,7 +1337,8 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
   const photos = photoNumbers(job, s);
   // 申請書から見積書への連動（下の「見積書へ連動」。空なら連動する）。連動しないときは、申請書で入れたことを見積書の行に入れない（ユーザーの指示
   // 「申請書を入力したら、見積もりへ連動する機能もオン、オフ切り替えできるようにする」2026-11-11）。見積書から外した箇所（`offEstimate`）も入れない
-  const linked = job.shinseiLink !== false;
+  const externalEstimate = canImportOitaEstimate(s.officeName, insurer);
+  const linked = !externalEstimate && job.shinseiLink !== false;
   // 見積書にまだ何も入れていない箇所は、改修の種類・手すりの種類・高さ・ベースプレートに合わせて見積書の空きの行（手すり・ブラケット・施工費など）を作り直す（`withSlots`）。
   // flow＝見積書に入れる箇所か（連動していて、見積書から外していない）
   const setPlace = (id: string, fn: (p: Place, flow: boolean) => Place) =>
@@ -1345,7 +1346,7 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
       ...j,
       places: j.places.map((p) => {
         if (p.id !== id) return p;
-        const flow = j.shinseiLink !== false && !offEstimate(p);
+        const flow = !externalEstimate && j.shinseiLink !== false && !offEstimate(p);
         const next = fn(p, flow);
         return flow ? withSlots(next) : next;
       }),
@@ -1516,7 +1517,7 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
                       </option>
                     ))}
                   </select>
-                  {!DEMO && offEstimate(p) && (
+                  {!DEMO && !externalEstimate && offEstimate(p) && (
                     <button
                       type="button"
                       onClick={() => toEstimate(p.id)}
@@ -1654,7 +1655,7 @@ function WorksEditor({job, setJob, s, insurer, materials}: {job: Job; setJob: (f
           <option value={OTHER_PLACE}>そのほか（名前を打つ）</option>
         </select>
         {/* 申請書から見積書への連動のオン・オフ（ユーザーの指示 2026-11-11。初めはオン。様邸ごと。複製では引き継ぐ）。（株）イヤーズ デモアプリは見積書がないので出さない */}
-        {!DEMO && (
+        {!DEMO && !externalEstimate && (
           <label className="flex items-center gap-1.5 text-sm text-slate-700">
             <input type="checkbox" checked={linked} onChange={(e) => setJob((j) => ({...j, shinseiLink: e.target.checked ? undefined : false}))} />
             見積書へ連動

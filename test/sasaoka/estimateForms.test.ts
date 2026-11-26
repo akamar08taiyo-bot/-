@@ -269,3 +269,16 @@ test('見積書の品名から大文字の英字だけのシリーズ名（BAUHA
   const r = {id: 'r', kind: 'material' as const, refId: null, name: 'BAUHAUS セパレートブラケット', code: 'BD-01G', maker: 'マツ六', unit: '個', price: 0, qty: 1, listPrice: 1350, lengthCm: 0, pieceLengthM: 0, estPrice: null, excluded: false, estText: null, estNote: null, estAmount: null};
   assert.equal(materialText(r), 'マツ六 BD-01G セパレートブラケット');
 });
+
+test('大分の外部見積は申請書だけの箇所を表示せず、見積明細がある箇所を表示する', () => {
+  const applicationOnly = place('浴室', [manualRow('material', {slot: 'rail'})]);
+  const imported = place('玄関', [mat('取り込んだ部材', 1000)]);
+  const draft = {places: [applicationOnly], insurer: 'oita' as const};
+  for (const all of [true, false]) {
+    assert.deepEqual(formLines(draft, S, 'yukuhashi', {all}), []);
+    assert.deepEqual(formLines({...draft, insurer: 'yukuhashi'}, {...S, officeName: '大分営業所'}, 'yukuhashi', {all}), []);
+    assert.equal(formLines({...draft, insurer: 'yukuhashi'}, S, 'yukuhashi', {all})[0].placeName, '浴室');
+    const lines = formLines({...draft, places: [applicationOnly, imported]}, S, 'yukuhashi', {all});
+    assert.deepEqual(lines.map((line) => line.placeName), ['玄関']);
+  }
+});

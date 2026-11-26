@@ -8,7 +8,7 @@ import {missingShikiri, ShikiriPriceDialog} from '../components/JobTools.tsx';
 import {KitPicker} from '../components/Kits.tsx';
 import {MaterialPicker} from '../components/Pickers.tsx';
 import {Btn, DropArea, Modal, TextInput, useToast} from '../components/ui.tsx';
-import {FORM_INFO, formLabel, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_SHINSEI} from '../estimateForms.ts';
+import {canImportOitaEstimate, FORM_INFO, formLabel, INSURER_IDS, INSURER_INFO, insurerForAddress, jobForm, jobInsurer, NO_SHINSEI} from '../estimateForms.ts';
 import {CARE_RED, careLines, showsCareLines} from '../careLines.ts';
 import {BurdenPicker} from './ShinseiEditor.tsx';
 import {builderChoices} from '../shinseiOffice.ts';
@@ -26,7 +26,7 @@ import {rememberStaff} from '../lastStaff.ts';
 import {staffFull, thisMonth, todayIso, yen} from '../util.ts';
 import {duplicateEstimate} from './EstimateList.tsx';
 import {UriageDialog} from './UriageDialog.tsx';
-import {applyImport, canImportOitaEstimate, compactName, readDoc} from '../importDocs.ts';
+import {applyImport, compactName, readDoc} from '../importDocs.ts';
 import type {ReadDoc} from '../importDocs.ts';
 import type {JobDocs} from '../components/DocsDialog.tsx';
 
@@ -70,7 +70,7 @@ export function EstimateEditor({
   const [uriageOpen, setUriageOpen] = useState(false);
 
   const setJob = (fn: (j: Job) => Job) => update('jobs', (list) => list.map((j) => (j.id === job.id ? startEstimate(j, {...fn(j), updatedAt: Date.now()}) : j)));
-  const canImport = !DEMO && canImportOitaEstimate(s.officeName, insurer);
+  const canImport = canImportOitaEstimate(s.officeName, insurer);
   const importInput = useRef<HTMLInputElement>(null);
   const [readingEstimate, setReadingEstimate] = useState(false);
   const [estimateImport, setEstimateImport] = useState<ReadDoc | null>(null);

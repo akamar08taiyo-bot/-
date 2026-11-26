@@ -12,7 +12,7 @@ import {estimateAmount, estimateTotals, hasEstimateRows, isBlankRow, overheadAut
 import {CARE_LINE} from './careLines.ts';
 import {plateFromText} from './cutLink.ts';
 import type {EstimateSettings} from './calc.ts';
-import {jobInsurer, KINDS, NO_SHINSEI} from './estimateForms.ts';
+import {canImportOitaEstimate, jobInsurer, KINDS, NO_SHINSEI} from './estimateForms.ts';
 import {readRiyuBook, NO_RIYU} from './riyu.ts';
 import {manualRow, newPlace} from './rows.ts';
 import {withSlots} from './railSlots.ts';
@@ -500,10 +500,6 @@ function readOtherShinsei(sheets: Sheet[], file: string, hash: string): ReadDoc 
   doc.address = rightOf(rows, (l) => /^住所$/.test(l), (v) => /[都道府県市区町村郡]/.test(v) && !COMPANY.test(v));
   if (doc.total) doc.info = {cost: doc.total};
   return doc;
-}
-
-export function canImportOitaEstimate(officeName: string, insurer: Insurer | '' = ''): boolean {
-  return officeName.trim() === '大分営業所' || insurer === 'oita';
 }
 
 /**

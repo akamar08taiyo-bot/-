@@ -17,7 +17,7 @@ import {useEffect, useLayoutEffect, useRef} from 'react';
 import type {CSSProperties, ReactNode} from 'react';
 import {estimateTotals} from '../calc.ts';
 import {CARE_RED, withCareLines} from '../careLines.ts';
-import {circled, FORM_INFO, formLines, KINDS, lineNote, paginate, reiwa, sheetNewLine, TOTAL_ROWS} from '../estimateForms.ts';
+import {canImportOitaEstimate, circled, FORM_INFO, formLines, jobInsurer, KINDS, lineNote, paginate, reiwa, sheetNewLine, TOTAL_ROWS} from '../estimateForms.ts';
 import type {FormLine} from '../estimateForms.ts';
 import type {Job, Settings} from '../types.ts';
 import {num, yen} from '../util.ts';
@@ -137,7 +137,7 @@ const copiedAttr = (sheet: SheetOpts | null | undefined, l: FormLine) => (sheet?
 function sheetLines(job: Job, s: Settings, form: 'yukuhashi' | 'kouiki', sheet: SheetOpts | null | undefined) {
   if (!sheet) return formLines(job, s, form);
   const lines = formLines(job, s, form, {all: true});
-  return [...lines, sheetNewLine(job, lines, form, sheet.mark)];
+  return [...lines, sheetNewLine(job, lines, form, sheet.mark, canImportOitaEstimate(s.officeName, jobInsurer(job)))];
 }
 
 // ================================================================ 苅田町・行橋市・みやこ町用「工事費見積書兼工事費内訳書」（列の幅などは formLayout.ts）

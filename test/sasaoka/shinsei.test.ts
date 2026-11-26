@@ -2196,12 +2196,12 @@ test('大分市：支給申請兼施工承認申請書に書く（改修の内�
   const text = cellTexts(files);
   const a = byName.get('支給申請兼施工承認申請書')!;
   const at = (ref: string) => text(a, ref);
-  assert.deepEqual([at('L3'), at('L4')], ['ヤマダ タロウ', '山田 太郎']);
+  assert.deepEqual([at('L3'), at('L4')], ['ヤマダ タロウ', '　山田 太郎']);
   assert.equal(digitsOf(a, ['AP', 'AQ', 'AR', 'AS', 'AT', 'AU', 'AV', 'AW', 'AX', 'AY'].map((c) => `${c}3`)), '0000366989');
   assert.equal(at('L7'), '明･大･昭　　15年　3月　15日生');
   assert.equal(at('AG7'), '要支援 (　　）　･　要介護 (　２　）');
   assert.equal(at('L9'), '令和8年4月1日　～　令和10年3月31日');
-  assert.deepEqual([at('L11'), at('AO11'), at('L13'), at('AN13')], ['大分県大分市見本町2-3', '097-111-2222', '山田 太郎', '本人']);
+  assert.deepEqual([at('L11'), at('AO11'), at('L13'), at('AN13')], ['大分県大分市見本町2-3', '097-111-2222', '　山田 太郎', '本人']);
   assert.equal(at('AN2'), '　　　□償還　　　　■受領委任'); // 原本で■受領委任
   // 改修の内容：手すりの取付け（17行）・段差の解消（19行）に箇所と施工者・予定日。ほかの種類は「－」で、予定日の欄は原本のまま
   assert.deepEqual([at('O17'), at('O19'), at('O21'), at('O27')], ['①浴室　②勝手口', '③トイレ', '－', '－']); // 欄の幅に入るだけ1行に並べる（packKindCells）

@@ -11,7 +11,7 @@ import {normalize} from './priceImport.ts';
 import {isOpenSlot} from './railSlots.ts';
 import type {EstimateForm, Insurer, Job, Place, Row, Settings, ShinseiInfo, ShinseiMarks} from './types.ts';
 import {num, yen} from './util.ts';
-import {DEMO_HIDDEN_INSURERS} from './demo/flag.ts';
+import {DEMO, DEMO_HIDDEN_INSURERS} from './demo/flag.ts';
 
 export const FORM_IDS: EstimateForm[] = ['yukuhashi', 'kouiki'];
 
@@ -147,6 +147,10 @@ export function jobInsurer(job: Pick<Job, 'insurer' | 'form' | 'address'>): Insu
   const byAddress = insurerForAddress(job.address);
   if (byAddress && (!job.form || INSURER_INFO[byAddress].form === job.form)) return byAddress;
   return job.form === 'kouiki' ? 'kouiki' : '';
+}
+
+export function canImportOitaEstimate(officeName: string, insurer: Insurer | '' = ''): boolean {
+  return !DEMO && (officeName.trim() === '大分営業所' || insurer === 'oita');
 }
 
 /** 様邸の見積書の書式：保険者を選んであればその書式、なければ選んだ書式、住所から、それでも分からなければ設定の書式 */
@@ -325,10 +329,13 @@ export type FormLine = {
 };
 
 /** all：金額のない施工費の行も出す（見積書に直接入力するとき。まだ金額を入れていない行も直せるように） */
-export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateRate' | 'estimateLaborRate' | 'estimateHourRate'>, form: EstimateForm, opts: {all?: boolean} = {}): FormLine[] {
+export function formLines(job: Pick<Job, 'places'> & Partial<Pick<Job, 'insurer' | 'form' | 'address'>>, s: Pick<Settings, 'estimateRate' | 'estimateLaborRate' | 'estimateHourRate'> & Partial<Pick<Settings, 'officeName'>>, form: EstimateForm, opts: {all?: boolean} = {}): FormLine[] {
   const photos = photoNumbers(job, s);
   const out: FormLine[] = [];
+  const external = canImportOitaEstimate(s.officeName ?? '', jobInsurer({insurer: job.insurer, form: job.form ?? '', address: job.address ?? ''}));
   job.places.forEach((place, pi) => {
+    // 以前に申請書から作られた空き行も、取り込んだ明細が入るまでは表示しない。
+    if (external && place.rows.every(isBlankRow)) return;
     (opts.all ? estimatePlaceLines(place, s) : shownLines(place, s)).forEach((l, i) => {
       const base = {
         place: pi,
@@ -407,8 +414,8 @@ export function formLines(job: Pick<Job, 'places'>, s: Pick<Settings, 'estimateR
  * 見積書に直接入力するときの、いちばん下の空いた行（打ち込むと行が増える）。
  * 最後の箇所に行がなければ、その箇所の名前・改修の種類・写真番号を出す（そこに入る）。mark は広域連合用の「材／手」
  */
-export function sheetNewLine(job: Pick<Job, 'places'>, lines: FormLine[], form: EstimateForm, mark: '材' | '手' = '材'): FormLine {
-  const at = lastEstimateIndex(job); // 見積書から外した箇所（申請書だけの箇所）はとばす
+export function sheetNewLine(job: Pick<Job, 'places'>, lines: FormLine[], form: EstimateForm, mark: '材' | '手' = '材', external = false): FormLine {
+  const at = external ? -1 : lastEstimateIndex(job); // 見積書から外した箇所（申請書だけの箇所）はとばす
   const last = at >= 0 ? job.places[at] : undefined;
   const pending = last && last.rows.length === 0 ? last : null;
   // 写真番号は見積書に出る箇所と申請書だけの箇所の数のつぎ（photoNumbers と同じ数え方）

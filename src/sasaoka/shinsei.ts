@@ -1042,6 +1042,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
       {
         sheet: '支給申請兼施工承認申請書',
         name: 'L4',
+        nameFormat: '　{name}',
         address: 'L11',
         insuredNo: boxes('AP', 10, 3),
         marks: [ERA('L7')],
@@ -1053,7 +1054,7 @@ export const SHINSEI: Partial<Record<Insurer, ShinseiMap>> = {
           T('AG7', '要支援 (　{careS}　）　･　要介護 (　{careK}　）'),
           T('L9', '{careTerm}'),
           T('AO11', '{phone}'),
-          T('L13', '{owner}'),
+          T('L13', '　{owner}'),
           T('AN13', '{relation}'),
           T('L29', '{cost}円'),
           T('AB29', '{targetYen}円'),
