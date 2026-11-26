@@ -67,8 +67,21 @@ const SENDER_FIELDS: {key: keyof SenderInfo; label: string}[] = [
   {key: 'fax', label: 'FAX'},
 ];
 
+function senderFromPortal(sender: SenderInfo): SenderInfo {
+  try {
+    const name = JSON.parse(localStorage.getItem('taiyo_portal_session') || 'null')?.office;
+    const office = typeof name === 'string' ? findOffice(name) : undefined;
+    if (office) return {...sender, ...office, person: sender.office === office.office ? sender.person : ''};
+  } catch {
+    // アプリを直接開いたときは保存済みの差出人を使う。
+  }
+  return sender;
+}
+
+const sanitizePortalSender = (raw: unknown) => senderFromPortal(sanitizeSender(raw));
+
 export function FaxApp() {
-  const [sender, setSender] = usePersistentState<SenderInfo>('sender', DEFAULT_SENDER, sanitizeSender);
+  const [sender, setSender] = usePersistentState<SenderInfo>('sender', senderFromPortal(DEFAULT_SENDER), sanitizePortalSender);
   const [layout, setLayout] = usePersistentState<SheetLayout>('layout', 'classic', sanitizeLayout);
   const [font, setFont] = usePersistentState<SheetFont>('font', 'original', sanitizeFont);
   const [customTemplates, setCustomTemplates] = usePersistentState<CustomTemplates>(
