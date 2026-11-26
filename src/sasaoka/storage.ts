@@ -5,7 +5,7 @@
 // どちらかが保存するたびに、その項目の「印」（stamp:項目名）を変える。前に読んだときと印が違えば、ほかのアプリ・タブが
 // 保存したということなので、読み直す・まとめてから保存する（sync.ts）。
 
-import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, OLD_DEFAULT_PLACES, SETTINGS_REV, STAFF_FULL_NAMES} from './defaults.ts';
+import {DEFAULT_LABOR, DEFAULT_PLACES, DEFAULT_STAFF, defaultSettings, OFFICES, OLD_DEFAULT_PLACES, SETTINGS_REV, STAFF_FULL_NAMES, portalOffice, settingsForOffice} from './defaults.ts';
 import {guessPieceLengthM} from './priceImport.ts';
 import {jobInsurer, MARK_INFO, MARK_KEYS, NO_SHINSEI} from './estimateForms.ts';
 import {cleanEdit} from './photoEdit.ts';
@@ -687,13 +687,28 @@ export async function loadAllStamped(): Promise<{
     /* localStorage を見る */
   }
   for (const k of DATA_KEYS) if (raw[k] === undefined) raw[k] = lsGet(k);
+  const settings = cleanKey('settings', raw.settings);
+  const office = OFFICES.find((entry) => entry.name === portalOffice());
+  let activeSettings = settings;
+  if (office) {
+    activeSettings = settingsForOffice(settings, office.name);
+    if (settings.officeName !== office.name) {
+      const account = settings.applicationAccounts?.[office.name];
+      activeSettings.person = '';
+      if (settings.applicationOffice) activeSettings.applicationOffice = office.name;
+      activeSettings.bankAccount = account;
+      activeSettings.bank = account
+        ? [account.institution, account.branch, account.type, account.number, account.holder].map((value) => value.trim()).join(' ')
+        : '';
+    }
+  }
   return {
     data: {
       materials: cleanKey('materials', raw.materials),
       labor: cleanKey('labor', raw.labor),
       jobs: cleanKey('jobs', raw.jobs),
       kits: cleanKey('kits', raw.kits),
-      settings: cleanKey('settings', raw.settings),
+      settings: activeSettings,
     },
     stamps,
   };
