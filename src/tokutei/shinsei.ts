@@ -234,7 +234,7 @@ export type SheetWrite = {
   marks?: Mark[];
   hideZeros?: boolean; // 式が空の欄を参照して 0 と出るシート
   block?: {cell: string; head: string[]; body: string; tail: string[]}; // 理由のかたまり（みやこ町）：head の行・body（理由。欄の幅で折り返す）・tail の行を、入る大きさにして書く
-  formats?: [string, {wrap?: boolean; numFmt?: number; color?: string}][]; // 書式を変える欄（折り返す・表示形式・字の色。福岡市の必要な理由・購入金額）
+  formats?: [string, Parameters<typeof formatCell>[3]][]; // 書式を変える欄（折り返す・表示形式・字の色。福岡市の必要な理由・購入金額）
   lines?: {cells: string[]; text: string}; // 1行ずつの欄に分けて書く文（大分市の福祉用具が必要な理由の5行）：最初の欄の幅で折り返し、入らなければ全部の欄を小さくする
   // 原本に行橋営業所の名前・所在地・電話・所長がそのまま書いてある欄（行橋市・苅田町・みやこ町の受任者・委任状）。申請書の営業所（設定）が
   // ちがえば、その字だけを書きかえる（officeCells。前は ほかの営業所で作っても行橋営業所のままだった）
@@ -1001,7 +1001,10 @@ function oitaSheets(v: ShinseiValues): SheetWrite[] {
       ],
       lines: {cells: OITA_REASON_CELLS, text: reasonText(v)},
       // 原本は書く欄の字が赤（市の様式の入力の目印）。書いた値は黒にする（福岡市と同じ）
-      formats: ['I4', 'I5', ...boxes('AK', 10, 4), ...rowsOf('A', OITA_ROWS), ...rowsOf('N', OITA_ROWS), 'I20', ...boxes('AK', 10, 20), ...OITA_REASON_CELLS].map((ref): [string, {color: string}] => [ref, {color: BLACK}]),
+      formats: [
+        ...['I4', 'I5', ...rowsOf('A', OITA_ROWS), ...rowsOf('N', OITA_ROWS), 'I20', ...OITA_REASON_CELLS].map((ref): [string, {color: string}] => [ref, {color: BLACK}]),
+        ...[...boxes('AK', 10, 4), ...boxes('AK', 10, 20)].map((ref): [string, {color: string; center: boolean}] => [ref, {color: BLACK, center: true}]),
+      ],
       fit: ['I4', 'I5', 'I20', 'I27', 'F36', ...rowsOf('N', OITA_ROWS.slice(0, shown.length)), ...rowsOf('Y', OITA_ROWS.slice(0, shown.length))],
       // 電話番号は結合していない1つの欄で、右の空いた欄へはみ出して書く（原本の「電話番号　－　－」と同じ）。行の右の端までに入る大きさに
       fitIn: [['AF37', 'AF37:AT37']],
@@ -1185,18 +1188,49 @@ function writeBlock(files: Files, sheet: string, block: NonNullable<SheetWrite['
   if (pt < style.size) sizeCell(files, sheet, block.cell, Math.max(4.5, pt));
 }
 
-/**
- * 1行ずつの欄（大分市の福祉用具が必要な理由の5行。点線で区切った行）に文を分けて書く：最初の欄の幅で折り返し、
- * 行の数が欄の数より多ければ、入るまで全部の欄の文字を小さくする（行の高さにも入る大きさまで）
- */
+/** 同じ行数のまま、行末に数文字だけ残る折り返しをならす。 */
+function balanceReason(text: string, width: number, pt: number, lines: string[]): string[] {
+  if (lines.length < 2 || emOf(lines.at(-1) ?? '') >= emOf(lines[0]) * 0.5) return lines;
+  let best = lines;
+  let low = width / 2;
+  let high = width;
+  for (let i = 0; i < 10; i++) {
+    const middle = (low + high) / 2;
+    const trial = wrapText(text, middle, pt);
+    if (trial.length > lines.length) low = middle;
+    else {
+      high = middle;
+      best = trial;
+    }
+  }
+  return best;
+}
+
+/** 大分市の理由欄は、5つの既存行に分けて、入る範囲で原本の文字サイズを保つ。 */
 function writeLines(files: Files, sheet: string, spec: NonNullable<SheetWrite['lines']>): void {
-  if (!spec.text) return;
+  const paragraphs = spec.text.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (!paragraphs.length) return;
   const {box, style} = cellBox(files, sheet, spec.cells[0]);
-  let pt = style.size;
-  let lines = wrapText(spec.text, box.w * WRAP_ROOM, pt);
-  for (; pt > 4.5 && (lines.length > spec.cells.length || (pt * 4) / 3 > box.h - 2); pt -= 0.5) lines = wrapText(spec.text, box.w * WRAP_ROOM, pt - 0.5);
+  const width = box.w * WRAP_ROOM;
+  const combined = paragraphs.join('　');
+  let pt = Math.min(style.size, (box.h - 2) * 0.75);
+  let merged = false;
+  let groups: string[][];
+  for (;;) {
+    groups = paragraphs.map((part) => wrapText(part, width, pt));
+    if (groups.flat().length <= spec.cells.length) break;
+    const flowing = wrapText(combined, width, pt);
+    if (flowing.length <= spec.cells.length) {
+      groups = [flowing];
+      merged = true;
+      break;
+    }
+    // 極端に長い文も末尾を切らず、まず幅の概算で大きさを下げる。
+    pt = pt > 5 ? pt - 0.25 : Math.min(pt * 0.95, (width - 6) * 0.75 * spec.cells.length / emOf(combined));
+  }
+  const lines = groups.flatMap((group, i) => balanceReason(merged ? combined : paragraphs[i], width, pt, group));
   writeCells(files, sheet, new Map(spec.cells.map((ref, i): [string, CellValue] => [ref, lines[i] ?? ''])));
-  if (pt < style.size) for (const ref of spec.cells) sizeCell(files, sheet, ref, Math.max(4.5, pt));
+  if (pt < style.size) for (const ref of spec.cells) sizeCell(files, sheet, ref, pt);
 }
 
 /** 開いた原本（unzipSync したもの）に書き込んで、申請書（.xlsx）のバイト列にする。files は書きかえる（原本を何度も使うなら {...files} を渡す） */

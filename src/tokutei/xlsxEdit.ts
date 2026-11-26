@@ -299,16 +299,19 @@ export const sizeStyle = (files: Files, style: number, pt: number): number => va
  * numFmt＝表示形式（組み込みの番号。福岡市の購入金額は原本が「標準」なので 3＝#,##0 にする。記載例と同じ）、
  * color＝字の色（rgb。福岡市の原本は書く欄の字が様式と同じ色の所があるので、記載例と同じ黒に）
  */
-export function formatCell(files: Files, sheet: string, ref: string, change: {wrap?: boolean; numFmt?: number; color?: string}): void {
+export function formatCell(files: Files, sheet: string, ref: string, change: {wrap?: boolean; numFmt?: number; color?: string; center?: boolean}): void {
   const path = sheetPath(files, sheet);
   const xml = strFromU8(files[path]);
   const found = cellRe(ref).exec(xml);
   if (!found) return;
   let alignment: string | undefined;
-  if (change.wrap) {
-    const now = alignmentOf(files, xml, ref);
-    const tag = /^<alignment\b[^>]*?(?=\/?>)/.exec(now)?.[0];
-    alignment = tag ? now.replace(tag, `${tag.replace(/\swrapText="[^"]*"/, '')} wrapText="1"`) : '<alignment wrapText="1"/>';
+  if (change.wrap || change.center) {
+    const now = alignmentOf(files, xml, ref) || '<alignment/>';
+    const tag = /^<alignment\b[^>]*?(?=\/?>)/.exec(now)?.[0] ?? '<alignment';
+    let attrs = tag;
+    if (change.wrap) attrs = `${attrs.replace(/\swrapText="[^"]*"/, '')} wrapText="1"`;
+    if (change.center) attrs = `${attrs.replace(/\s(?:horizontal|vertical)="[^"]*"/g, '')} horizontal="center" vertical="center"`;
+    alignment = now.replace(tag, attrs);
   }
   files[path] = strToU8(setStyle(xml, ref, String(variantStyle(files, numOf(attrOf(found[1], 's'), 0), {alignment, numFmt: change.numFmt, color: change.color}))));
 }

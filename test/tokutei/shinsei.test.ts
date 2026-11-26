@@ -665,6 +665,11 @@ test('大分市：支給申請書（第12号様式）と委任状。受領委任
   assert.equal(at('Y16'), '円'); // 使わない行は原本のまま
   assert.equal(at('I20'), '太陽シルバーサービス㈱　大分営業所');
   assert.equal(boxes('AK', 10, 20).map(at).join(''), '4000000002');
+  const numbersXml = strFromU8(f[sheetPath(f, OITA_SHEETS.shinsei)]);
+  for (const ref of [...boxes('AK', 10, 4), ...boxes('AK', 10, 20)]) {
+    const style = cellStyle(f, numbersXml, ref);
+    assert.deepEqual([style.horizontal, style.vertical], ['center', 'center'], ref);
+  }
   assert.deepEqual(OITA_REASON_CELLS.map(at), ['浴室の床からの立ち座りが困難なため。', '浴槽の出入りでふらつくため。', '', '', '']);
   assert.match(at('I27'), /^　（記入者名）　見本 太郎　+（事業者名）　見本居宅介護支援事業所\n/);
   assert.match(at('I27'), /■介護支援専門員/);
@@ -942,4 +947,20 @@ test('行橋市・苅田町・みやこ町の原本に書いてある行橋営�
   const y2 = fillWith('yukuhashi', yk);
   assert.equal(readCell(y2, '委任状', 'C14'), readCell(template('yukuhashi'), '委任状', 'C14'));
   assert.equal(readCell(y2, '用具・受領委任払', 'G29'), readCell(template('yukuhashi'), '用具・受領委任払', 'G29'));
+});
+
+test('大分市：3商品分の理由を文字を落とさず5行におさめ、短い断片を残さない', () => {
+  const reasons = [
+    '立った姿勢を長く保つことが難しく、洗身中にバランスを崩して転倒する危険がある。シャワーチェアに座って姿勢を安定させ、安全に入浴を続けられる。',
+    '立ち上がりや歩き始めにバランスを崩しやすく、転倒の不安がある。自立する多点杖を使い、立ち座りや歩き始めの動作を安定させる。',
+    '浴槽内で座った姿勢を保つことが難しく、体が滑りやすい。浴槽台に腰掛け、無理のない姿勢で湯につかり、浴槽内での転倒を防ぐ。',
+  ];
+  const f = fillOT({items: reasons.map((reason, i) => item({id: String(i), name: `見本商品${i}`, listPrice: 10000, reason}))});
+  const sh = OITA_SHEETS.shinsei;
+  const lines = OITA_REASON_CELLS.map((ref) => readCell(f, sh, ref)).filter(Boolean);
+  assert.ok(lines.length <= 5);
+  assert.equal(lines.join('').replace(/　/g, ''), reasons.join(''));
+  assert.ok(lines.every((line) => [...line].length >= 15), JSON.stringify(lines));
+  const xml = strFromU8(f[sheetPath(f, sh)]);
+  assert.ok(cellStyle(f, xml, 'I22').size >= 8);
 });
