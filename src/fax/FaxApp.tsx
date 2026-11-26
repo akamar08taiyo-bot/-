@@ -266,6 +266,7 @@ export function FaxApp() {
                   新しいFAXを作る
                 </button>
               )}
+              <OfficePicker sender={sender} onChange={setSender} />
               <FontPicker value={font} onChange={setFont} />
             </div>
           </div>
@@ -730,6 +731,36 @@ const ADDRESS_FIELDS = [
   {key: 'fax', label: 'FAX'},
 ] as const;
 
+/** 画面上部と差出人欄で、同じ営業所・連絡先を選ぶ。 */
+function OfficePicker({sender, onChange}: {
+  sender: SenderInfo;
+  onChange: (update: (prev: SenderInfo) => SenderInfo) => void;
+}) {
+  const officeId = useId();
+  const current = findOffice(sender.office);
+  return (
+    <div className="flex items-center gap-1.5">
+      <label htmlFor={officeId} className="whitespace-nowrap text-xs font-medium text-slate-600">営業所</label>
+      <select
+        id={officeId}
+        value={current ? current.office : ''}
+        onChange={(e) => {
+          const office = findOffice(e.target.value);
+          if (office) onChange((prev) => ({...prev, ...office}));
+        }}
+        className={`${fieldClass} cursor-pointer pr-1`}
+      >
+        {!current && <option value="">{sender.office || '選んでください'}</option>}
+        {OFFICE_GROUPS.map((group) => (
+          <optgroup key={group.department} label={group.department}>
+            {group.offices.map((office) => <option key={office.office} value={office.office}>{office.office}</option>)}
+          </optgroup>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 /**
  * 画面下の「差出人」の帯。営業所（営業部ごとの一覧）と担当をいつも見えるところで選べるようにし、
  * その下に、印刷される差出人（会社名・営業部名・営業所名・住所・TEL・FAX）を出す。
@@ -742,9 +773,7 @@ function SenderBar({
   sender: SenderInfo;
   onChange: (update: (prev: SenderInfo) => SenderInfo) => void;
 }) {
-  const officeId = useId();
   const personId = useId();
-  const current = findOffice(sender.office);
   const missing = ADDRESS_FIELDS.filter((f) => !sender[f.key]).map((f) => f.label);
   const labelClass = 'whitespace-nowrap text-[length:var(--fx-label-text)] font-medium text-slate-600';
   return (
@@ -754,32 +783,7 @@ function SenderBar({
           <Settings2 className="h-4 w-4 text-slate-500" aria-hidden />
           差出人
         </h2>
-        <div className="flex items-center gap-1.5">
-          <label htmlFor={officeId} className={labelClass}>
-            営業所
-          </label>
-          <select
-            id={officeId}
-            value={current ? current.office : ''}
-            onChange={(e) => {
-              const office = findOffice(e.target.value);
-              if (office) onChange((prev) => ({...prev, ...office}));
-            }}
-            className={`${fieldClass} cursor-pointer pr-1`}
-          >
-            {/* 一覧にない営業所名を「詳しい設定」で入れたときは、その名前をそのまま出す */}
-            {!current && <option value="">{sender.office || '選んでください'}</option>}
-            {OFFICE_GROUPS.map((g) => (
-              <optgroup key={g.department} label={g.department}>
-                {g.offices.map((o) => (
-                  <option key={o.office} value={o.office}>
-                    {o.office}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </div>
+        <OfficePicker sender={sender} onChange={onChange} />
         <div className="flex items-center gap-1.5">
           <label htmlFor={personId} className={labelClass}>
             担当
